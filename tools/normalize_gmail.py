@@ -86,6 +86,14 @@ def main():
             if "Spam" in labels or "Trash" in labels:
                 n_skipped_label += 1
                 continue
+            # Noise policy (Daniel, 2026-07-02): promo/updates/social tabs are noise
+            # unless the message is sent/starred/important/personal/receipt mail.
+            DROP = ("Category Promotions", "Category Updates", "Category Social")
+            KEEP = ("Sent", "Important", "Starred", "Category Personal",
+                    "Category Purchases", "Category Travel", "Category Bills")
+            if any(d in labels for d in DROP) and not any(k in labels for k in KEEP):
+                n_skipped_label += 1
+                continue
             from_addr = parseaddr(hdr(msg, "From"))[1].lower()
             to_addr = parseaddr(hdr(msg, "To"))[1].lower()
             who = "me" if from_addr == ME else "them"
