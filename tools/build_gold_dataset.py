@@ -46,6 +46,37 @@ def parse():
     return items
 
 
+def enrich(items):
+    """Restore FULL context the curation sheet truncated for readability.
+    Text pairs: full prior-turn window from scorecard-pairs.jsonl.
+    Email pairs: walk the reply-chain ancestors in gmail.jsonl."""
+    pairs = [json.loads(l) for l in open(
+        os.path.expanduser("~/twin-corpus/index/scorecard-pairs.jsonl"), encoding="utf-8")]
+    gmail = [json.loads(l) for l in open(
+        os.path.expanduser("~/twin-corpus/normalized/gmail.jsonl"), encoding="utf-8")]
+    by_id = {r["message_id"]: r for r in gmail if r.get("message_id")}
+    by_reply = {r["text"][:60]: r for r in gmail if r["who"] == "me"}
+
+    for it in items:
+        if it["kind"] == "text":
+            for p in pairs:
+                if (p["chat"] == it["chat"] and p["date"][:10] == it["date"]
+                        and p["reply"][:50] == it["reply"][:50]):
+                    it["context"] = p["context"]          # full window
+                    break
+        else:
+            me = by_reply.get(it["reply"][:60])
+            chain, cur = [], me and by_id.get(me.get("in_reply_to", ""))
+            hops = 0
+            while cur and hops < 3:                        # walk thread ancestors
+                chain.append(f'{cur["who"]}: {cur["text"][:400]}')
+                cur = by_id.get(cur.get("in_reply_to", ""))
+                hops += 1
+            if len(chain) > 1:                             # first ancestor == inbound
+                it["context"] = list(reversed(chain[1:]))
+    return items
+
+
 def push_langfuse(items):
     pk, sk = os.environ["LANGFUSE_PUBLIC_KEY"], os.environ["LANGFUSE_SECRET_KEY"]
     base = os.environ.get("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
@@ -78,7 +109,7 @@ def push_langfuse(items):
 
 
 def main():
-    items = parse()
+    items = enrich(parse())
     with open(OUT, "w", encoding="utf-8") as f:
         for it in items:
             f.write(json.dumps(it, ensure_ascii=False) + "\n")
