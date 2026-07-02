@@ -109,7 +109,7 @@ def main():
             if p.get("subject"):
                 f.write(f"Subject: {p['subject']}\n\n")
             for c in p.get("context", [])[-3:]:
-                if c != "email-thread":
+                if c != "email-thread" and clean(c):
                     f.write(f"> {c}\n")
             f.write(f"\n**Inbound:** {p['inbound']}\n\n")
             f.write(f"**Your reply:** {p['reply']}\n\n---\n\n")
