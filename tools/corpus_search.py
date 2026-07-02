@@ -29,6 +29,8 @@ def main():
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--since", default=None)
     ap.add_argument("--who", choices=["me", "them"], default=None)
+    ap.add_argument("--chat", default=None,
+                    help="filter to one conversation/correspondent (substring match)")
     args = ap.parse_args()
 
     sql = ("SELECT source, chat, date, who, sender, text, bm25(msgs) AS score "
@@ -40,6 +42,9 @@ def main():
     if args.who:
         sql += " AND who = ?"
         params.append(args.who)
+    if args.chat:
+        sql += " AND chat LIKE ?"
+        params.append(f"%{args.chat}%")
     sql += " ORDER BY score LIMIT ?"
     params.append(args.k)
 

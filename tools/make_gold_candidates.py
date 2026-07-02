@@ -59,8 +59,11 @@ def main():
     cands = imessage_pairs() + email_pairs()
     with open(OUT, "w", encoding="utf-8") as f:
         f.write("# Gold pair curation\n\n")
-        f.write("Mark `[x]` on ~20 pairs where the reply is authentically, recognizably you.\n")
-        f.write("Kill anything you would not send today. Edit nothing else.\n\n")
+        f.write("Mark `[x]` on ~20 pairs where the reply is authentically, recognizably you\n")
+        f.write("AND there is a clear right answer (kill vague or unverifiable ones).\n")
+        f.write("For each kept pair, add an audience tag after the [x]:\n")
+        f.write("`F` family · `C` close friend · `P` professional · `O` other.\n")
+        f.write("Aim for rough balance: ~5 per audience. Example: `## [x P] 12. ...`\n\n")
         for i, p in enumerate(cands, 1):
             f.write(f"## [ ] {i}. ({p['kind']}) {p['chat']}  ·  {p['date'][:10]}\n\n")
             if p.get("subject"):
