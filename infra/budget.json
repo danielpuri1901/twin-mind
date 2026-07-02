@@ -1,0 +1,7 @@
+{
+  "BudgetName": "twin-mind-monthly",
+  "BudgetLimit": { "Amount": "50", "Unit": "USD" },
+  "TimeUnit": "MONTHLY",
+  "BudgetType": "COST",
+  "CostTypes": { "IncludeCredit": false, "IncludeRefund": false }
+}
