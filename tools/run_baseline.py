@@ -48,15 +48,54 @@ def exemplars(chat, k=8):
         return []
 
 
+STOP = set("the and for with that this what when where your just like have has had "
+           "you are was were will would could should about from they them then than "
+           "there here been being some very much many more most also into over".split())
+
+
+def topical_context(item, k=6):
+    """Lexical topical retrieval: facts from Daniel's life relevant to the inbound,
+    time-scoped to the pair's date, with answer-leakage guard."""
+    text = item["inbound"] + " " + " ".join(item.get("context", [])[-2:])
+    words = [w.strip(".,!?()\"'").lower() for w in text.split()]
+    kw = sorted({w for w in words if len(w) >= 4 and w.isalpha() and w not in STOP},
+                key=len, reverse=True)[:6]
+    if not kw:
+        return []
+    try:
+        out = subprocess.run([sys.executable, SEARCH, " ".join(kw), "--any",
+                              "--until", item["date"] + "T00:00:00", "--k", "12"],
+                             capture_output=True, text=True, timeout=30).stdout
+        hits = [json.loads(l) for l in out.splitlines() if l.strip()]
+    except Exception:
+        return []
+    safe = []
+    for h in hits:
+        if h["chat"] == item["chat"] and abs(len(h["text"]) - len(item["reply"])) < 5:
+            continue                                  # likely the gold reply itself
+        if h["text"][:80] in item["reply"] or item["reply"][:80] in h["text"]:
+            continue                                  # answer leakage
+        if h["chat"] == item["chat"] and h["date"][:10] == item["date"]:
+            continue                                  # same-thread same-day leakage
+        safe.append(f'{h["date"][:10]} [{h["source"]}] {h["who"]}: {h["text"][:180]}')
+        if len(safe) >= k:
+            break
+    return safe
+
+
 def draft(item, voice):
     ex = exemplars(item["chat"])
     ex_block = "\n".join(f"- {e[:200]}" for e in ex) or "(no exemplars found)"
+    facts = topical_context(item)
+    facts_block = ("\n\nPOSSIBLY RELEVANT FACTS FROM DANIEL'S LIFE (retrieved from his "
+                   "corpus as of this date; may be irrelevant - use ONLY if pertinent, "
+                   "never force them in):\n" + "\n".join(f"- {f}" for f in facts)) if facts else ""
     system = (
         "You are Daniel Puri's twin. Draft his reply to the inbound message. "
         "Match his real voice for THIS audience. Output ONLY the reply text.\n\n"
         f"AUDIENCE: {item['audience']} ({item['kind']})\n\n"
         f"HOW DANIEL ACTUALLY WRITES TO THIS PERSON (recent real examples):\n{ex_block}\n\n"
-        f"VOICE PROFILE (excerpt):\n{voice[:3500]}\n\n"
+        f"VOICE PROFILE (excerpt):\n{voice[:3500]}{facts_block}\n\n"
         "If professional: Daniel-at-his-clearest - short sentences, one idea each, no filler."
     )
     ctx = "\n".join(item.get("context", []))

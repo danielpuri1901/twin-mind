@@ -31,14 +31,23 @@ def main():
     ap.add_argument("--who", choices=["me", "them"], default=None)
     ap.add_argument("--chat", default=None,
                     help="filter to one conversation/correspondent (substring match)")
+    ap.add_argument("--until", default=None, help="only records dated on/before this")
+    ap.add_argument("--any", action="store_true",
+                    help="OR semantics: match any token instead of all")
     args = ap.parse_args()
 
+    q = fts_query(args.query)
+    if args.any:
+        q = " OR ".join(q.split())
     sql = ("SELECT source, chat, date, who, sender, text, bm25(msgs) AS score "
            "FROM msgs WHERE msgs MATCH ?")
-    params = [fts_query(args.query)]
+    params = [q]
     if args.since:
         sql += " AND date >= ?"
         params.append(args.since)
+    if args.until:
+        sql += " AND date <= ?"
+        params.append(args.until)
     if args.who:
         sql += " AND who = ?"
         params.append(args.who)
