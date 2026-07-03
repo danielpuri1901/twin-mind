@@ -47,7 +47,19 @@ def main():
             ev = {}
         elif line.startswith("END:VEVENT") and ev is not None:
             st = ev.get("start")
-            if st and lo <= st < hi:
+            if st and ev.get("rrule"):
+                # expand recurrences into the window (standard dateutil, not hand-rolled)
+                from dateutil.rrule import rrulestr
+                dur = (ev.get("end") - st) if ev.get("end") else timedelta(hours=1)
+                try:
+                    for occ in rrulestr(ev["rrule"], dtstart=st).between(lo, hi, inc=True):
+                        occ = occ.replace(tzinfo=None)
+                        if occ.date() in ev.get("exdates", set()):
+                            continue
+                        out.append({**ev, "start": occ, "end": occ + dur})
+                except (ValueError, TypeError):
+                    pass  # malformed rule: skip rather than crash the brief
+            elif st and lo <= st < hi:
                 out.append(ev)
             ev = None
         elif ev is not None:
@@ -55,6 +67,11 @@ def main():
                 ev["start"] = parse_dt(line.split(":", 1)[-1])
             elif line.startswith("DTEND"):
                 ev["end"] = parse_dt(line.split(":", 1)[-1])
+            elif line.startswith("RRULE:"):
+                ev["rrule"] = line.split(":", 1)[-1].strip()
+            elif line.startswith("EXDATE"):
+                ev.setdefault("exdates", set()).add(
+                    (parse_dt(line.split(":", 1)[-1]) or datetime.min).date())
             elif line.startswith("SUMMARY"):
                 ev["summary"] = line.split(":", 1)[-1].replace("\\,", ",").strip()
             elif line.startswith("LOCATION"):
