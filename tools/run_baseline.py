@@ -62,10 +62,14 @@ def topical_context(item, k=6):
                 key=len, reverse=True)[:6]
     if not kw:
         return []
+    mode = os.environ.get("TWIN_RETRIEVAL", "lexical")
+    # lexical wants keywords; semantic/hybrid want the natural sentence (meaning)
+    query = " ".join(kw) if mode == "lexical" else text[:300]
     try:
-        out = subprocess.run([sys.executable, SEARCH, " ".join(kw), "--any",
+        out = subprocess.run([sys.executable, SEARCH, query, "--any",
+                              "--mode", mode,
                               "--until", item["date"] + "T00:00:00", "--k", "12"],
-                             capture_output=True, text=True, timeout=30).stdout
+                             capture_output=True, text=True, timeout=60).stdout
         hits = [json.loads(l) for l in out.splitlines() if l.strip()]
     except Exception:
         return []

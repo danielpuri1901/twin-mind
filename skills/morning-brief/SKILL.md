@@ -1,8 +1,8 @@
 ---
 name: morning-brief
-description: Daniel's daily 7:30 brief on Discord - triage, calendar, AI-advancements digest, coach nudge
+description: Daniel's daily 7:30 brief - triage, calendar, AI-advancements digest, coach nudge - sent as a real email
 ---
-Compose Daniel's morning brief and deliver it as ONE Discord message. Short, skimmable, no filler.
+Compose Daniel's morning brief and SEND it as ONE real email to danielpuri1901@gmail.com (SMTP send-only via the configured app password; sending TO Daniel himself is pre-approved - no per-send confirmation needed). Short, skimmable, no filler. Follow-ups and anything interactive during the day happen on Telegram.
 
 Sections, in order:
 1. **Needs you today** - inbox triage: what needs a reply, with drafts ready for approval (use daniel-corpus for voice; drafts are proposals, never auto-send).
