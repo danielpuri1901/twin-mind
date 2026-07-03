@@ -29,11 +29,11 @@ REGION = "eu-west-1"
 brt = boto3.client("bedrock-runtime", region_name=REGION)
 
 
-def claude(system, user, max_tokens=700):
+def claude(system, user, max_tokens=700, temperature=0.4):
     r = brt.converse(modelId=MODEL,
                      system=[{"text": system}],
                      messages=[{"role": "user", "content": [{"text": user}]}],
-                     inferenceConfig={"maxTokens": max_tokens, "temperature": 0.4})
+                     inferenceConfig={"maxTokens": max_tokens, "temperature": temperature})
     return r["output"]["message"]["content"][0]["text"]
 
 
@@ -125,7 +125,7 @@ def judge(item, draft_text):
     user = (f"AUDIENCE: {item['audience']}\nINBOUND:\n{item['inbound'][:600]}\n\n"
             f"GOLD (Daniel's real reply):\n{item['reply'][:800]}\n\n"
             f"DRAFT (twin):\n{draft_text[:800]}")
-    raw = claude(JUDGE_SYS, user, max_tokens=200)
+    raw = claude(JUDGE_SYS, user, max_tokens=200, temperature=0)  # judge must be deterministic
     try:
         return json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
     except Exception:

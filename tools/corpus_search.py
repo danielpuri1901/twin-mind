@@ -83,7 +83,8 @@ def main():
     ap.add_argument("--any", action="store_true",
                     help="OR semantics: match any token instead of all")
     ap.add_argument("--mode", choices=["lexical", "semantic", "hybrid"],
-                    default="lexical", help="retrieval backend (contract stays identical)")
+                    default="hybrid", help="retrieval backend (contract stays identical); "
+                    "hybrid is the eval-chosen default (bake-off 2026-07-03)")
     args = ap.parse_args()
 
     cols = ["source", "chat", "date", "who", "sender", "text", "score"]
