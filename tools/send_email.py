@@ -48,6 +48,18 @@ def main():
         s.send_message(msg)
     print(f"sent: '{args.subject}' -> {ME}")
 
+    # Dead-man's switch: heartbeat on every successful brief send (code-level,
+    # so the LLM can't forget it). A CloudWatch alarm screams if 24h pass silent.
+    if args.subject.lower().startswith("morning brief"):
+        try:
+            import boto3
+            boto3.client("cloudwatch", region_name="eu-west-1").put_metric_data(
+                Namespace="TwinMind",
+                MetricData=[{"MetricName": "BriefSent", "Value": 1.0}])
+            print("heartbeat: BriefSent metric emitted")
+        except Exception as e:  # never let the ping break the mail
+            print(f"heartbeat FAILED (mail still sent): {e}")
+
 
 if __name__ == "__main__":
     main()
