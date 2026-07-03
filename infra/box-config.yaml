@@ -1,0 +1,33 @@
+# Twin Mind - box configuration (deployed to ~/.hermes/config.yaml on the EC2 box)
+# Differences from the Mac (deliberate, documented):
+#   terminal.backend: docker  (the sandbox the Mac couldn't have - plan Task 12)
+#   stt.enabled: false        (2GB box can't run local whisper; voice transcription
+#                              returns when a Groq key is added: stt.provider: groq)
+model:
+  default: eu.anthropic.claude-sonnet-4-6
+  provider: bedrock
+  base_url: https://bedrock-runtime.eu-west-1.amazonaws.com
+bedrock:
+  region: eu-west-1
+approvals:
+  mode: manual
+  cron_mode: deny
+terminal:
+  backend: docker
+  docker_image: python:3.11-slim
+stt:
+  enabled: false
+web:
+  search_backend: tavily
+  extract_backend: firecrawl
+plugins:
+  enabled:
+    - observability/langfuse
+  disabled: []
+mcp_servers:
+  notion:
+    url: https://mcp.notion.com/mcp
+    auth: oauth
+  granola:
+    url: https://mcp.granola.ai/mcp
+    auth: oauth

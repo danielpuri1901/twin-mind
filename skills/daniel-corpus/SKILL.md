@@ -2,7 +2,7 @@
 name: daniel-corpus
 description: Search and cite Daniel's personal corpus (messages, email, transcripts, calendar, wiki)
 ---
-Daniel's personal corpus lives at /Users/danielpuri/twin-corpus/.
+Daniel's personal corpus lives at ~/twin-corpus/.
 Coverage: 2017-2026 across 6 sources (iMessage, Gmail, Google Chat, calendar, contacts, meeting transcripts). See wiki/index.md for per-source windows.
 
 Retrieval - use ONLY this contract (the backend is swappable; never raw SQL, never grep the JSONL):
