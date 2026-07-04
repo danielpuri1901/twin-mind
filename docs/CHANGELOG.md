@@ -1,6 +1,15 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-04 - first production incident, resolved same day
+- INCIDENT: first unattended 7:30 brief failed to email (silently). Root cause: Docker terminal sandbox starved the agent's hands (.env/tools/venv absent in container). The twin diagnosed its own confinement, composed a degraded-but-smart brief from Granola+memory, delivered via Telegram, and stated the cause. Latest-state rules visibly applied ("state ambiguous - present as question").
+- FIX 1: box terminal.backend -> local (documented trade-off: single-purpose zero-inbound box; approvals+SOUL rules remain; "Docker with proper mounts" backlogged).
+- FIX 2: inbox_read --hours was date-granular (IMAP SINCE) -> real hour cutoff added. CORRECTION: yesterday's "test email arrived" was a false positive from this bug; box email delivery had never actually worked until today.
+- FIX 3: heartbeat via aws CLI subprocess (system python3 lacked boto3; failure was swallowed as designed).
+- VERIFIED end-to-end as cron runs it: email delivered + BriefSent metric = 1.0 in CloudWatch.
+- LESSON BANKED: detection lag (24h alarm) too slow - tighter schedule-aware check backlogged; verification tools must be tested for lying before being trusted.
+- Also: AWS login session expiry keeps severing the admin tunnel (3rd time) - scoped automation credential for the Mac->box sync queued in hardening batch.
+
 ## 2026-07-03 (evening session)
 - MILESTONE COMPLETE: morning brief cron scheduled (7:30 daily, box) + scheduled path proven E2E (test brief delivered) + dead-man's switch armed (code-level BriefSent heartbeat in send_email.py, 24h CloudWatch alarm -> SNS; pending Daniel's subscription confirm).
 - cron_mode: deny confirmed NOT to block the brief's send path.
