@@ -51,11 +51,12 @@ def main():
     # Dead-man's switch: heartbeat on every successful brief send (code-level,
     # so the LLM can't forget it). A CloudWatch alarm screams if 24h pass silent.
     if args.subject.lower().startswith("morning brief"):
-        try:
-            import boto3
-            boto3.client("cloudwatch", region_name="eu-west-1").put_metric_data(
-                Namespace="TwinMind",
-                MetricData=[{"MetricName": "BriefSent", "Value": 1.0}])
+        try:  # aws CLI is preinstalled on the box and the Mac - zero python deps
+            import subprocess
+            subprocess.run(["aws", "cloudwatch", "put-metric-data",
+                            "--namespace", "TwinMind", "--metric-name", "BriefSent",
+                            "--value", "1", "--region", "eu-west-1"],
+                           check=True, capture_output=True, timeout=30)
             print("heartbeat: BriefSent metric emitted")
         except Exception as e:  # never let the ping break the mail
             print(f"heartbeat FAILED (mail still sent): {e}")
