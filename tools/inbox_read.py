@@ -70,7 +70,11 @@ def main():
             msg = email.message_from_bytes(raw)
             flags = " ".join(str(p) for p in msgdata if isinstance(p, bytes))
             try:
-                date = parsedate_to_datetime(msg.get("Date")).isoformat()
+                dt = parsedate_to_datetime(msg.get("Date"))
+                date = dt.isoformat()
+                # IMAP SINCE is date-granular; enforce the real hour cutoff here
+                if dt.timestamp() < (datetime.now().astimezone() - timedelta(hours=args.hours)).timestamp():
+                    continue
             except Exception:
                 date = ""
             print(json.dumps({
