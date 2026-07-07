@@ -63,7 +63,9 @@ def main():
         except Exception:
             pass
 
-    since = (datetime.now() - timedelta(hours=args.hours)).strftime("%d-%b-%Y")
+    # server-side coarse filter must be at least as wide as the client cutoff,
+    # else IMAP censors mail before the precise filter sees it (2026-07-07 review)
+    since = min(CUTOFF, datetime.now().astimezone() - timedelta(hours=args.hours)).strftime("%d-%b-%Y")
     with imaplib.IMAP4_SSL("imap.gmail.com") as im:
         im.login(ME, PW)
         im.select("INBOX", readonly=True)          # readonly: belt
