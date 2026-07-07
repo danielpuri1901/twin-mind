@@ -53,8 +53,15 @@ def snippet(msg, maxlen=200):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=24)
+    ap.add_argument("--since-last-brief", action="store_true")
     ap.add_argument("--limit", type=int, default=30)
     args = ap.parse_args()
+    CUTOFF = datetime.now().astimezone() - timedelta(hours=args.hours)
+    if args.since_last_brief:
+        try:
+            CUTOFF = datetime.fromisoformat(open(os.path.expanduser("~/.hermes/state/last_brief_sent")).read().strip())
+        except Exception:
+            pass
 
     since = (datetime.now() - timedelta(hours=args.hours)).strftime("%d-%b-%Y")
     with imaplib.IMAP4_SSL("imap.gmail.com") as im:
@@ -73,7 +80,7 @@ def main():
                 dt = parsedate_to_datetime(msg.get("Date"))
                 date = dt.isoformat()
                 # IMAP SINCE is date-granular; enforce the real hour cutoff here
-                if dt.timestamp() < (datetime.now().astimezone() - timedelta(hours=args.hours)).timestamp():
+                if dt.timestamp() < CUTOFF.timestamp():
                     continue
             except Exception:
                 date = ""

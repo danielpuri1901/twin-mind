@@ -51,6 +51,11 @@ def main():
     # Dead-man's switch: heartbeat on every successful brief send (code-level,
     # so the LLM can't forget it). A CloudWatch alarm screams if 24h pass silent.
     if args.subject.lower().startswith("morning brief"):
+        try:  # cursor: next brief triages mail since THIS send - no window gaps
+            sd = os.path.expanduser("~/.hermes/state"); os.makedirs(sd, exist_ok=True)
+            open(os.path.join(sd, "last_brief_sent"), "w").write(datetime.now().astimezone().isoformat())
+        except Exception as e:
+            print(f"cursor write failed (non-fatal): {e}")
         try:  # aws CLI is preinstalled on the box and the Mac - zero python deps
             import subprocess
             subprocess.run(["aws", "cloudwatch", "put-metric-data",
