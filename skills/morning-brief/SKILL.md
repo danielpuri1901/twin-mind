@@ -11,6 +11,11 @@ Sections, in order:
 4. **Coach** (1 item) - one nudge from the coach backlog, spaced-repetition style: resurface a prior nudge if unacknowledged, else one new observation grounded in recent corpus evidence.
 5. **Open loops** (max 3) - from wiki/topics pages: commitments or threads going stale.
 
+Inbox coverage (added 2026-07-07 after missed-email incident):
+- Read inbox with `--since-last-brief` (cursor from the last successful send) - NEVER a fixed --hours window; a failed morning must widen the next window, not drop mail.
+- You may see items already triaged in a previous brief (at-least-once overlap): skip them silently. A duplicate mention beats a silent miss.
+- The brief's final line MUST state coverage: "Triaged N messages since <cursor date/time>." - N is the tool's actual output count. This line is machine-checked.
+
 Rules:
 - **Latest-state check (added after the first brief's two staleness errors, 2026-07-03):** before marking ANY item actionable, verify it is still live: scan for newer messages in the same thread, and corpus-search the counterpart/topic for state changes (a call that already happened, a date that moved, a thread Daniel closed). The newest evidence wins. If state is ambiguous, present it as a question ("did the Tiff call already happen?"), never as an action.
 - NO job-search scanning (paused by Daniel 2026-07-02; he will say when it returns).
