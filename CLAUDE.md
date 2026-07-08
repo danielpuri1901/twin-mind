@@ -18,6 +18,7 @@ Design: `docs/2026-06-30-twin-mind-design.md` · Build plan: `docs/gameplan.md` 
 - **Build order:** validate the whole twin ON THE MAC (index, wiki, gold pairs, local Hermes vs Bedrock) before creating any AWS resource beyond CLI auth + Bedrock access. AWS is lift-and-shift of a known-good config.
 - **Channel (final, 2026-07-02):** Telegram = interactive home (official Bot API - stable for years, zero ban risk, free proactive, not blocked at work). Morning brief = real email send via Daniel's Gmail (SMTP app password, send-only; NEVER the Hermes email gateway adapter on his personal inbox - it marks all mail seen and polls). Discord dropped (blocked at work); WhatsApp Baileys optional later as a parallel channel (unofficial bridge: re-pairing + ban risk documented).
 - **Eval-first:** build the scorecard before tuning anything. Nothing "improves" the twin unless it beats the scorecard.
+- **Ship gate (mechanized 2026-07-08):** no change to skills, SOUL, tools, prompts, or model tier ships to the box without `tools/eval.sh` green (triage regression at 100%). Baseline: 9/9 PASS on first run, 2026-07-08.
 - **Autonomy by reversibility:** act autonomously on read / search / research / draft; require human approval for send / spend / commit / anything irreversible.
 - **Cost discipline:** credits go to compute (Bedrock + a one-off GPU for the fine-tune), not storage. Stop GPUs the moment a run ends. No idle managed services.
 

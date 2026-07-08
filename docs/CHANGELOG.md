@@ -1,6 +1,13 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-08 - Session A complete: the evals RUN
+- Deployed to box: SOUL time rule, inbox cursor + coverage contract, digest section ("one technical thing" daily, interview-gap queue leads), 8 learning-wiki files. Gateway restarted.
+- FIRST regression suite run: tools/run_triage.py (3 tasks x 3 trials, code+judge graders, tracked metrics) -> 9/9 PASS. Baseline established.
+- tools/eval.sh = the ship gate; CLAUDE.md rule: no skill/prompt/model change ships without it green.
+- Research trio audited (Anthropic evals + BEA, OpenAI guide, 12-Factor): ~85% aligned; fix plan at docs/plans/2026-07-08-compliance-fix-plan.md (Session B: brief workflow-ification; Session C: hardening).
+- Interview retrace: verbatim misses filed + Tiffany debrief transcript in corpus; Robert window ~Aug 6 (Daniel's own request, confirmed by mailbox read); triage-03 minted from the brief's missed-reply error.
+
 ## 2026-07-04 - first production incident, resolved same day
 - INCIDENT: first unattended 7:30 brief failed to email (silently). Root cause: Docker terminal sandbox starved the agent's hands (.env/tools/venv absent in container). The twin diagnosed its own confinement, composed a degraded-but-smart brief from Granola+memory, delivered via Telegram, and stated the cause. Latest-state rules visibly applied ("state ambiguous - present as question").
 - FIX 1: box terminal.backend -> local (documented trade-off: single-purpose zero-inbound box; approvals+SOUL rules remain; "Docker with proper mounts" backlogged).
