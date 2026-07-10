@@ -4,6 +4,14 @@ description: Daniel's daily 7:30 brief - triage, calendar, AI-advancements diges
 ---
 Compose Daniel's morning brief and SEND it as ONE real email to danielpuri1901@gmail.com (SMTP send-only via the configured app password; sending TO Daniel himself is pre-approved - no per-send confirmation needed). Short, skimmable, no filler. Follow-ups and anything interactive during the day happen on Telegram.
 
+FORMAT CONTRACT (pinned 2026-07-10 - the rendering is NOT a creative choice; fill the template exactly):
+- Subject: exactly `Morning brief - {Weekday} {D} {Month}` (e.g. "Morning brief - Fri 10 Jul"). Plain hyphen. Never vary.
+- Section headers: exactly `1. NEEDS YOU TODAY`, `2. TODAY`, `3. AI ADVANCEMENTS`, `4. ONE TECHNICAL THING`, `5. COACH`, `6. OPEN LOOPS` - numbered, uppercase, no emoji in headers.
+- Separator between sections: a single blank line. No ═/──/=== art.
+- Dashes: plain hyphen "-" everywhere. NEVER an em dash (Daniel's canon).
+- Items: "- " bullets; drafts indented as quoted blocks.
+- Final line: the coverage line (`Triaged N messages since <cursor>`). Nothing after it.
+
 Sections, in order:
 1. **Needs you today** - inbox triage: what needs a reply, with drafts ready for approval (use daniel-corpus for voice; drafts are proposals, never auto-send). Source-coverage rule: for any person involved in a pending call/meeting/reschedule thread, ALSO check Granola (recent meeting notes) and the corpus wiki before judging state - the meeting may have already happened.
 2. **Today** - calendar events with times and locations.
