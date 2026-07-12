@@ -14,6 +14,8 @@ We follow two LangChain articles, translated to a one-user agent (~10 traces/day
 | One-click trace->dataset | one-APPROVAL: any "bad + note" verdict makes the twin DRAFT a regression item from the trace; Daniel approves; item lands in the dataset | BUILD (skill) |
 | Escalate: cheap checks always, LLM judge only on dips | adopt at scale; for now judges run daily (cost trivial) | doctrine |
 | Alert thresholds | dead-man (have) + brief_check failure -> Telegram alert + 2 consecutive "bad" verdicts on a section -> flag in next brief | BUILD-lite |
+| Retrieval quality (Daniel's ask) | two halves: (a) DID IT LOOK - deterministic trace check: required tool calls happened (part of invariant suite); (b) DID IT FIND - no auto ground truth; Daniel's "missed X" notes = retrieval-miss labels -> regression items | (a) BUILD with invariants; (b) doctrine |
+| Generation density (Daniel's ask) | 2-4 facts per item, deterministic, part of brief_check format contract | BUILD next |
 | Thread-level evals | tau2-style fixture scenarios (queued as run_regression --agent) | queued |
 | Insights / pattern mining | monthly pass over feedback.jsonl + traces; findings become dataset items or skill changes | doctrine |
 
