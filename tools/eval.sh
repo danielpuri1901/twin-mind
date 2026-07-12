@@ -5,10 +5,10 @@
 set -e
 cd "$(dirname "$0")/.."
 PY="$HOME/.hermes/hermes-agent/venv/bin/python"
-echo "== twin-triage regression (bar: 100%) =="
-"$PY" tools/run_triage.py --trials 3
+echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
+"$PY" tools/run_regression.py --trials 3
 if [ "$1" = "--full" ]; then
-  echo "== gold-32 drafting benchmark =="
-  "$PY" tools/run_baseline.py
+  echo "== drafting benchmark: how good is it getting (no bar; compare runs) =="
+  "$PY" tools/run_benchmark.py
 fi
 echo "EVAL GATE: GREEN"

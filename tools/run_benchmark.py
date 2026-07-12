@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""
+"""Drafting benchmark: measures HOW GOOD replies are (voice, content) against 32 real pairs.
+No pass bar - used to COMPARE recipes/models. 
 run_baseline.py - draft replies for every gold pair and judge them.
 Creates a Langfuse dataset run ("experiment") with per-slice scores.
 

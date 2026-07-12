@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Triage regression runner - executes twin-triage-v1 per the agent-evals playbook.
+"""Regression suite: proves the twin still avoids every mistake it has made in production.
+Current items are inbox-triage judgments (dataset: twin-triage-v1); more failure classes join as they occur.
 
 Anatomy (Anthropic "Demystifying evals for agents", adopted 2026-07-08):
   task  = one triage-gold.jsonl item (evidence bundle -> expected judgment)
