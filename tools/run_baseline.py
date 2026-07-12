@@ -90,7 +90,11 @@ def topical_context(item, k=6):
 def draft(item, voice):
     ex = exemplars(item["chat"])
     ex_block = "\n".join(f"- {e[:200]}" for e in ex) or "(no exemplars found)"
-    facts = topical_context(item)
+    # Audience-conditional retrieval - the bake-off verdict (2026-07-03), finally
+    # deployed 2026-07-12 after Daniel's where-is-this-in-code question exposed the
+    # drift: family drafts scored WORSE with retrieved facts (noise injection), so
+    # code, not the model, decides. Professional/friends keep retrieval.
+    facts = [] if item["audience"] == "family" else topical_context(item)
     facts_block = ("\n\nPOSSIBLY RELEVANT FACTS FROM DANIEL'S LIFE (retrieved from his "
                    "corpus as of this date; may be irrelevant - use ONLY if pertinent, "
                    "never force them in):\n" + "\n".join(f"- {f}" for f in facts)) if facts else ""
