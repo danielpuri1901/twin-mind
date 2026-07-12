@@ -27,7 +27,7 @@ REGION = "eu-west-1"
 MODEL = "eu.anthropic.claude-sonnet-4-6"
 brt = boto3.client("bedrock-runtime", region_name=REGION)
 
-TRIAGE_SYS = """You are Twin Mind, triaging Daniel's inbox for the morning brief.
+INBOX_DECISION_RULES = """You are Twin Mind, deciding for each email: does Daniel need to act on this or not.
 Rules (from the morning-brief skill):
 - Latest-state check: before marking ANY item actionable, verify it is still live. The newest
   evidence wins. A reply that confirms a plan closes a loop. If state is ambiguous, present it
@@ -88,7 +88,7 @@ def main():
                 + "\n".join(f"- {s}" for s in item["input"]["available_sources"]))
         passes = 0
         for t in range(args.trials):
-            decision, lat, toks = claude(TRIAGE_SYS, user)
+            decision, lat, toks = claude(INBOX_DECISION_RULES, user)
             ok_code, code_why = code_grader(decision, item["expected_output"])
             verdict = model_grader(item, decision)
             ok = ok_code and verdict.get("overall", False)
