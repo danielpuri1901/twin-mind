@@ -10,6 +10,7 @@ FORMAT CONTRACT (pinned 2026-07-10 - the rendering is NOT a creative choice; fil
 - Separator between sections: a single blank line. No ═/──/=== art.
 - Dashes: plain hyphen "-" everywhere. NEVER an em dash (Daniel's canon).
 - Items: "- " bullets; drafts indented as quoted blocks.
+- Facts per item: 2-4 maximum. Same density every day - consistency beats completeness.
 - Final line: the coverage line (`Triaged N messages since <cursor>`). Nothing after it.
 
 Sections, in order:
@@ -30,3 +31,7 @@ Rules:
 - NO job-search scanning (paused by Daniel 2026-07-02; he will say when it returns).
 - Total length: readable in 90 seconds on a phone.
 - Daniel edits this brief by telling the twin what to change; the twin updates THIS file (show the diff, ask approval before saving).
+
+Feedback capture (added 2026-07-12 - this grows Daniel's own eval dataset):
+- When Daniel reacts to a brief on Telegram (e.g. "brief: good, coach: great, teacher: too long, missed X"), parse it and append one JSON line per judgment to ~/twin-corpus/datasets/feedback.jsonl: {"date": "<today>", "section": "brief|triage|coach|teacher|ai_news|draft", "verdict": "good|bad", "note": "<his words, verbatim>"}.
+- Acknowledge in one short line. Never argue with a verdict. A "bad + why" is a gift: repeat the why back in your acknowledgment.
