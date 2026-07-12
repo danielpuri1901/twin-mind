@@ -126,6 +126,39 @@ JUDGE_SYS = (
 )
 
 
+# --- Reference-overlap metrics (BLEU-2 precision, ROUGE-L recall) ---------
+# Deterministic, free, computed alongside the judge. Their JOB here is not to
+# replace the judge but to disagree with it instructively: high judge + low
+# ROUGE = same meaning, different words (fine); low judge + high ROUGE =
+# parroted surface, wrong substance (bad). Watch the disagreements.
+
+def _ngrams(tokens, n):
+    return [tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)]
+
+def bleu2(draft, gold):
+    """Modified 2-gram precision: of the draft's word-pairs, how many appear in gold."""
+    d, g = draft.lower().split(), gold.lower().split()
+    if len(d) < 2 or len(g) < 2:
+        return 0.0
+    dg, gg = _ngrams(d, 2), _ngrams(g, 2)
+    from collections import Counter
+    gc = Counter(gg)
+    hits = sum(min(c, gc[t]) for t, c in Counter(dg).items())
+    return hits / len(dg)
+
+def rouge_l(draft, gold):
+    """ROUGE-L recall: longest common subsequence / gold length - how much of
+    the reference's word SEQUENCE the draft recovers."""
+    d, g = draft.lower().split(), gold.lower().split()
+    if not d or not g:
+        return 0.0
+    dp = [[0]*(len(g)+1) for _ in range(len(d)+1)]
+    for i in range(1, len(d)+1):
+        for j in range(1, len(g)+1):
+            dp[i][j] = dp[i-1][j-1]+1 if d[i-1] == g[j-1] else max(dp[i-1][j], dp[i][j-1])
+    return dp[-1][-1] / len(g)
+
+
 def judge(item, draft_text):
     user = (f"AUDIENCE: {item['audience']}\nINBOUND:\n{item['inbound'][:600]}\n\n"
             f"GOLD (Daniel's real reply):\n{item['reply'][:800]}\n\n"
