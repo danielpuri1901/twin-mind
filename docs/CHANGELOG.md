@@ -1,6 +1,13 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-12 - the loop learns to listen
+- SHIPPED through the gate (9/9 green): brief format contract + fact-density pin, feedback capture (Daniel's daily verdicts -> datasets/feedback.jsonl), SOUL explaining rule, audience-retrieval router (drift found by Daniel's "where in the code?" - verdict 07-03, deployed 07-12, receipts: family content 0.37->0.07 under hybrid retrieval).
+- Renames per new global naming rule: run_triage->run_regression, run_baseline->run_benchmark, TRIAGE_SYS->INBOX_DECISION_RULES, scorecard-pairs->gold-candidates-pool; stale artifacts archived.
+- Doctrine adopted: docs/eval-doctrine.md - two LangChain online-eval articles translated to n=1 (deterministic checks on everything, judges calibrated against Daniel, verdicts->dataset within a day, weekly review queue). All four of Daniel's proposed evals (coach/teacher/email/retrieval) formally planned.
+- Artifacts: agent-memory whiteboard + evals whiteboard (claude.ai/code).
+- OPEN: brief_check.py (07:50 outcome+format verifier), datasets/ move, ~/twin-mind folder rename (Daniel's go), hardening session (automation credential first), judges after ~20 verdicts.
+
 ## 2026-07-08 - Session A complete: the evals RUN
 - Deployed to box: SOUL time rule, inbox cursor + coverage contract, digest section ("one technical thing" daily, interview-gap queue leads), 8 learning-wiki files. Gateway restarted.
 - FIRST regression suite run: tools/run_triage.py (3 tasks x 3 trials, code+judge graders, tracked metrics) -> 9/9 PASS. Baseline established.
