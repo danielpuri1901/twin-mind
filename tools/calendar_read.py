@@ -23,12 +23,28 @@ if os.path.exists(ENV):
 ICS_URL = os.environ["TWIN_CALENDAR_ICS_URL"]
 
 
-def parse_dt(val):
+def parse_dt(prop_line):
+    """Parse an ICS date property INCLUDING its timezone, return LOCAL-naive.
+    Three RFC 5545 forms: '...T170000Z' (UTC), ';TZID=America/New_York:...'
+    (that zone), bare digits (floating = already local). The 2026-07-13 bug:
+    we ignored the Z and told Daniel a 19:00 meeting was at 17:00."""
+    params, _, val = prop_line.partition(":")
     m = re.match(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?", val)
     if not m:
         return None
     y, mo, d, h, mi, s = m.groups()
-    return datetime(int(y), int(mo), int(d), int(h or 0), int(mi or 0), int(s or 0))
+    dt = datetime(int(y), int(mo), int(d), int(h or 0), int(mi or 0), int(s or 0))
+    if val.rstrip().endswith("Z"):
+        from datetime import timezone as _tz
+        return dt.replace(tzinfo=_tz.utc).astimezone().replace(tzinfo=None)
+    tzid = re.search(r"TZID=([^;:]+)", params)
+    if tzid:
+        try:
+            from zoneinfo import ZoneInfo
+            return dt.replace(tzinfo=ZoneInfo(tzid.group(1))).astimezone().replace(tzinfo=None)
+        except Exception:
+            pass  # unknown zone: fall through as floating
+    return dt
 
 
 def main():
@@ -64,14 +80,14 @@ def main():
             ev = None
         elif ev is not None:
             if line.startswith("DTSTART"):
-                ev["start"] = parse_dt(line.split(":", 1)[-1])
+                ev["start"] = parse_dt(line)
             elif line.startswith("DTEND"):
-                ev["end"] = parse_dt(line.split(":", 1)[-1])
+                ev["end"] = parse_dt(line)
             elif line.startswith("RRULE:"):
                 ev["rrule"] = line.split(":", 1)[-1].strip()
             elif line.startswith("EXDATE"):
                 ev.setdefault("exdates", set()).add(
-                    (parse_dt(line.split(":", 1)[-1]) or datetime.min).date())
+                    (parse_dt(line) or datetime.min).date())
             elif line.startswith("SUMMARY"):
                 ev["summary"] = line.split(":", 1)[-1].replace("\\,", ",").strip()
             elif line.startswith("LOCATION"):
