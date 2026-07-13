@@ -12,6 +12,7 @@ import argparse
 import os
 import smtplib
 import sys
+from datetime import datetime
 from email.mime.text import MIMEText
 
 ENV = os.path.expanduser("~/.hermes/.env")
