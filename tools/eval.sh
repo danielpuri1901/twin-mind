@@ -5,6 +5,8 @@
 set -e
 cd "$(dirname "$0")/.."
 PY="$HOME/.hermes/hermes-agent/venv/bin/python"
+echo "== tool regression tests (deterministic, free) =="
+python3 tools/test_tools.py
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" tools/run_regression.py --trials 3
 if [ "$1" = "--full" ]; then
