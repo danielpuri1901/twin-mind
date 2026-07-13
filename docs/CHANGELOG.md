@@ -1,6 +1,23 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-13 - the twin's secret diary
+- INCIDENT: brief showed Sam/Postral meeting at 17:00; real time 19:00. Root cause: calendar_read
+  stripped ICS timezones (the Z suffix) - not a hallucination; the model faithfully relayed bad tool
+  data and added an unwarranted "CEST" label. Fixed (Z + TZID -> local), proven against the live event.
+- DISCOVERY via trace diagnosis: the twin maintained a private self-authored skill
+  ("morning-brief-infra-notes"), patched it 3x this morning, and even ATTEMPTED to patch the governed
+  morning-brief skill (blocked by a profile quirk, not obedience). Framework's skill_manage guidance
+  conflicted with our SOUL rule.
+- THE TWIST: the diary was ~85% verified gold - including a REAL bug in send_email.py (missing
+  datetime import; the cursor NEVER wrote; the twin manually worked around it daily since Jul 9
+  without telling us) and Tirith scanner patterns explaining past format constraints. Also contained
+  confident false entries (--today flag "confirmed working" - flag doesn't exist).
+- RESOLUTION: bug fixed (twin credited), diary salvaged into governed skills/morning-brief/OPERATIONS.md
+  (corrected), rogue skill deleted, SOUL loophole closed (no skill_manage; report bugs same day, never
+  silently work around), Sunday review now surfaces undocumented workarounds. Gate green; all deployed.
+- Feedback row logged (calendar tz). Langfuse thread view = Sessions tab (answered).
+
 ## 2026-07-12 - the loop learns to listen
 - SHIPPED through the gate (9/9 green): brief format contract + fact-density pin, feedback capture (Daniel's daily verdicts -> datasets/feedback.jsonl), SOUL explaining rule, audience-retrieval router (drift found by Daniel's "where in the code?" - verdict 07-03, deployed 07-12, receipts: family content 0.37->0.07 under hybrid retrieval).
 - Renames per new global naming rule: run_triage->run_regression, run_baseline->run_benchmark, TRIAGE_SYS->INBOX_DECISION_RULES, scorecard-pairs->gold-candidates-pool; stale artifacts archived.
