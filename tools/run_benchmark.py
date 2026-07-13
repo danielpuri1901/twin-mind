@@ -115,6 +115,15 @@ def draft(item, voice):
     return claude(system, user)
 
 
+
+# Testability tags (audit 2026-07-13): 24/32 gold replies contain facts not derivable
+# from context - those items test STYLE ONLY; scoring content on them measures data
+# availability, not model quality. Tags: ~/twin-corpus/datasets/gold-audit.json
+import json as _json, os as _os
+_AUDIT = {t["id"]: t["verdict"] for t in _json.load(open(_os.path.expanduser(
+    "~/twin-corpus/datasets/gold-audit.json")))} if _os.path.exists(_os.path.expanduser(
+    "~/twin-corpus/datasets/gold-audit.json")) else {}
+
 JUDGE_SYS = (
     "You are a strict evaluator of a digital twin's drafted reply. Compare DRAFT to "
     "GOLD (what Daniel actually sent). Return ONLY JSON: "
