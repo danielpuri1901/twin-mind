@@ -24,14 +24,15 @@ HOME = os.path.expanduser("~")
 GOLD = os.path.join(HOME, "twin-corpus/index/gold-set.jsonl")
 VOICE = os.path.join(HOME, "twin-corpus/wiki/voice-profile.md")
 SEARCH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus_search.py")
-MODEL = "eu.anthropic.claude-sonnet-4-6"
+MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
+JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 REGION = "eu-west-1"
 
 brt = boto3.client("bedrock-runtime", region_name=REGION)
 
 
-def claude(system, user, max_tokens=700, temperature=0.4):
-    r = brt.converse(modelId=MODEL,
+def claude(system, user, max_tokens=700, temperature=0.4, model=None):
+    r = brt.converse(modelId=model or MODEL,
                      system=[{"text": system}],
                      messages=[{"role": "user", "content": [{"text": user}]}],
                      inferenceConfig={"maxTokens": max_tokens, "temperature": temperature})
@@ -163,7 +164,7 @@ def judge(item, draft_text):
     user = (f"AUDIENCE: {item['audience']}\nINBOUND:\n{item['inbound'][:600]}\n\n"
             f"GOLD (Daniel's real reply):\n{item['reply'][:800]}\n\n"
             f"DRAFT (twin):\n{draft_text[:800]}")
-    raw = claude(JUDGE_SYS, user, max_tokens=200, temperature=0)  # judge must be deterministic
+    raw = claude(JUDGE_SYS, user, max_tokens=200, temperature=0, model=JUDGE_MODEL)  # judge must be deterministic
     try:
         return json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
     except Exception:

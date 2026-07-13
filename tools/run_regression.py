@@ -24,7 +24,8 @@ import boto3
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GOLD = os.path.expanduser("~/twin-corpus/index/triage-gold.jsonl")
 REGION = "eu-west-1"
-MODEL = "eu.anthropic.claude-sonnet-4-6"
+MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
+JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 brt = boto3.client("bedrock-runtime", region_name=REGION)
 
 INBOX_DECISION_RULES = """You are Twin Mind, deciding for each email: does Daniel need to act on this or not.
@@ -46,9 +47,9 @@ describing correct behavior, return JSON only:
 EXPECTED OUTPUT. Judge substance, not wording."""
 
 
-def claude(system, user, max_tokens=500, temperature=0.4):
+def claude(system, user, max_tokens=500, temperature=0.4, model=None):
     t0 = time.time()
-    r = brt.converse(modelId=MODEL,
+    r = brt.converse(modelId=model or MODEL,
                      system=[{"text": system}],
                      messages=[{"role": "user", "content": [{"text": user}]}],
                      inferenceConfig={"maxTokens": max_tokens, "temperature": temperature})
@@ -69,7 +70,7 @@ def code_grader(decision, expected_output):
 def model_grader(item, decision):
     user = (f"DECISION:\n{decision}\n\nEXPECTED OUTPUT:\n{item['expected_output']}\n\n"
             f"GOLD ASSERTIONS:\n" + "\n".join(f"- {a}" for a in item["gold_behavior"]))
-    raw, _, _ = claude(JUDGE_SYS, user, max_tokens=400, temperature=0)
+    raw, _, _ = claude(JUDGE_SYS, user, max_tokens=400, temperature=0, model=JUDGE_MODEL)
     try:
         return json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
     except Exception:

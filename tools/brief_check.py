@@ -68,6 +68,22 @@ try:
 except Exception as e:
     fails.append(f"heartbeat check errored: {e}")
 
+# 2026-07-13: the twin once self-authored a skill. Governed skills are symlinks into
+# super-project; anything else (except Hermes bundled dirs) is unauthorized.
+try:
+    skills_dir = os.path.expanduser("~/.hermes/skills")
+    if os.path.isdir(skills_dir):
+        rogue = [d for d in os.listdir(skills_dir)
+                 if not os.path.islink(os.path.join(skills_dir, d)) and not d.startswith(".")]
+        governed_or_bundled = {"apple","autonomous-ai-agents","computer-use","creative","data-science",
+            "dogfood","email","github","media","mlops","note-taking","productivity","research",
+            "smart-home","social-media","software-development","yuanbao"}
+        rogue = [d for d in rogue if d not in governed_or_bundled]
+        if rogue:
+            fails.append(f"UNAUTHORIZED twin-authored skill(s) appeared: {rogue}")
+except Exception as e:
+    fails.append(f"skill-guard errored: {e}")
+
 if fails:
     print("BRIEF WATCHDOG - problems this morning:")
     for f in fails:
