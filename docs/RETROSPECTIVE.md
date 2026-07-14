@@ -104,11 +104,24 @@ Mac (corpus factory): iMessage export -> normalize -> wiki compile -> rsync to b
 5. When exports land: WhatsApp/Meta/Discord/TikTok -> normalize -> wiki v3.
 6. Earned-later: coach cadence, approved-external-send path, Groq voice on box, fine-tune experiment (the "twin brain").
 
-## Chapter 7 - Two agents in one day, and the eval that paid for itself (Jul 14)
+## Chapter 7 - The big day: a brief reborn, two new agents, and a gate that caught itself (Jul 14)
 
-The day started with a model question and ended with two new production agents.
+This was the longest, densest session so far - nineteen commits. It started with the daily brief and ended with three agents.
 
-First we settled the model.
+First the brief was rebuilt to v3, designed with Daniel in a live back-and-forth.
+The old brief tried to draft replies; the new one does not.
+Its core is act-fast: one-line "needs you today" items with no drafts, weather, a conversation-driven teacher section with real answers, dedupe enforced on the AI news, open-loops dropped.
+The architecture is the doctrine made concrete: a deterministic prefetch stage (state-flagged inbox, a noise tier, Open-Meteo weather) hands facts to a prose-only agent, and a v3 watchdog checks the result at 07:50 (subject date, quiz answer line, weather, dedupe).
+
+Then the repo was restructured, one folder per agent - agents/brief, agents/chat, shared, evals, pipeline - and the leanness law went into CLAUDE.md.
+The gate stayed green through the whole move, which was the point of having it.
+
+Then the judges were calibrated: 64 percent agreement with Daniel's labels to 80 in a single rubric iteration, by rescoping each rubric to what it actually judges (document-only for triage, teaching-quality for teacher).
+The rule held: when judge and human disagree, fix the rubric, never the human.
+Along the way the gate earned its keep three times - it caught a deleted JUDGE_SYS constant, caught a rules-extractor that broke when v3 removed its anchor, and forced an assertion-based regression pass after a rename skewed a holistic grader.
+Each was a loud failure at build time instead of a silent one in production.
+
+With the brief solid, we settled the model.
 A bake-off had been run across five models, but on the wrong ruler: the old 32-pair drafting-gold set, for a job (drafting replies) we no longer do.
 Daniel caught it in plain words: the evals were measuring a cancelled job, so their verdict was worthless.
 We built the right ruler instead - run_brief_bench.py, which feeds a real prefetch fixture and the real skill to each candidate and scores with Daniel-calibrated judges.
