@@ -28,23 +28,20 @@ MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
 JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 brt = boto3.client("bedrock-runtime", region_name=REGION)
 
-INBOX_DECISION_RULES = """You are Twin Mind, deciding for each email: does Daniel need to act on this or not.
-Rules (from the morning-brief skill):
-- Latest-state check: before marking ANY item actionable, verify it is still live. The newest
-  evidence wins. A reply that confirms a plan closes a loop. If state is ambiguous, present it
-  as a question, never as an action.
-- Source-coverage: for any person in a pending call/meeting/reschedule thread, consult meeting
-  notes (Granola) and the corpus wiki before judging state.
-- Never propose nudging or replying to someone whose latest message already answered the question.
-Given the evidence, produce:
-1. First line exactly: "ACTIONABLE: yes" or "ACTIONABLE: no"
-2. Then 2-4 sentences: your judgment of the current state and what (if anything) belongs in the brief."""
+def _load_production_rules():
+    """Extract the decision rules FROM the deployed skill so the gate tests the
+    PRODUCTION text, not a paraphrase (stepback #5: 'the gate evaluated a prompt
+    that is not the one in production')."""
+    skill = open(os.path.join(HERE, "skills/morning-brief/SKILL.md")).read()
+    start = skill.index("Rules:")
+    block = skill[start:start + 2000].split("\n\n")[0]
+    return ("You are Twin Mind, deciding for each email: does Daniel need to act on this or not.\n"
+            + block +
+            "\nGiven the evidence, produce:\n"
+            '1. First line exactly: "ACTIONABLE: yes" or "ACTIONABLE: no"\n'
+            "2. Then 2-4 sentences: your judgment of the current state and what (if anything) belongs in the brief.")
 
-JUDGE_SYS = """You are a strict evaluator. Given a triage DECISION and a list of GOLD ASSERTIONS
-describing correct behavior, return JSON only:
-{"assertions": [{"assertion": "...", "pass": true|false, "why": "..."}], "overall": true|false}
-"overall" is true only if the decision's substance would lead to the same brief content as the
-EXPECTED OUTPUT. Judge substance, not wording."""
+INBOX_DECISION_RULES = _load_production_rules()
 
 
 def claude(system, user, max_tokens=500, temperature=0.4, model=None):
