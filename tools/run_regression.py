@@ -44,6 +44,13 @@ def _load_production_rules():
 INBOX_DECISION_RULES = _load_production_rules()
 
 
+JUDGE_SYS = """You are a strict evaluator. Given a triage DECISION and a list of GOLD ASSERTIONS
+describing correct behavior, return JSON only:
+{"assertions": [{"assertion": "...", "pass": true|false, "why": "..."}], "overall": true|false}
+"overall" is true only if the decision's substance would lead to the same brief content as the
+EXPECTED OUTPUT. Judge substance, not wording."""
+
+
 def claude(system, user, max_tokens=500, temperature=0.4, model=None):
     t0 = time.time()
     r = brt.converse(modelId=model or MODEL,
