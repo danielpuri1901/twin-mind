@@ -59,7 +59,8 @@ def claude(system, user, max_tokens=500, temperature=0.4, model=None):
                      system=[{"text": system}],
                      messages=[{"role": "user", "content": [{"text": user}]}],
                      inferenceConfig={"maxTokens": max_tokens, "temperature": temperature})
-    text = r["output"]["message"]["content"][0]["text"]
+    # gpt-oss returns a reasoning block before the text block - find the text
+    text = next(c["text"] for c in r["output"]["message"]["content"] if "text" in c)
     usage = r.get("usage", {})
     return text, time.time() - t0, usage.get("outputTokens", 0)
 
