@@ -35,7 +35,9 @@ MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
 JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 REGION = "eu-west-1"
 
-brt = boto3.client("bedrock-runtime", region_name=REGION)
+from botocore.config import Config as _BotoCfg
+brt = boto3.client("bedrock-runtime", region_name=REGION,
+                   config=_BotoCfg(read_timeout=240, retries={"max_attempts": 3}))
 
 
 def claude(system, user, max_tokens=700, temperature=0.4, model=None):
