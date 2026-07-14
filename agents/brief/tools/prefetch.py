@@ -140,4 +140,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        main()
+    text = buf.getvalue()
+    print(text)
+    try:  # fixture archive: every real morning becomes a benchmark input forever
+        fd = os.path.expanduser("~/twin-corpus/datasets/prefetch-fixtures")
+        os.makedirs(fd, exist_ok=True)
+        open(os.path.join(fd, datetime.now().strftime("%Y-%m-%d") + ".txt"), "w").write(text)
+    except Exception as e:
+        print(f"(fixture archive failed, non-fatal: {e})")
