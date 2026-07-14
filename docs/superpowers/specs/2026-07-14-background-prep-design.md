@@ -46,3 +46,36 @@ Brief's model, decided separately: Haiku 4.5 three-day TRIAL after v3's first So
 ## Folder
 agents/background-prep/{SKILL.md, JOB.md, tools/scan_meetings.py}. Everything else is shared
 machinery already in production (watchdog, feedback capture, gate, corpus contract).
+
+## Stepback review fixes (adopted 2026-07-14, pre-build)
+1. TRIGGER REDESIGN (the reviewer's headline): NO exact window, NO one-shot self-scheduling.
+   Idempotent catch-up: every poll, prep any qualifying meeting starting within 75 min that has
+   no delivered prep and no in-flight claim; late detection ships with a "LATE" tag down to T-5.
+   State = JSON, three states per meeting-occurrence: claimed / delivered (on confirmed send) /
+   failed. Key = UID + occurrence-start (recurring events!). Poller writes a heartbeat file;
+   staleness >30 min alerts SAME-DAY via the existing alarm path - not at tomorrow's 07:50.
+2. SCOPE FILTER (gate zero PASSED - feed carries ATTENDEE/ORGANIZER/DESCRIPTION/UID/STATUS):
+   heuristic = any ATTENDEE outside the personal circle, excluding Daniel (NOT organizer - Daniel
+   organizes his own calls). Video-link detection from DESCRIPTION. Personal circle lives at
+   ~/.hermes/state/personal_circle.txt, seeded from contacts.jsonl, maintained by a one-tap
+   "never prep <person>" verdict reply - exists DAY ONE (the doctor-call false positive is not
+   acceptable even once).
+3. PRIVACY RULING adopted: name/company from the invite MAY be web-searched (equivalent to Daniel
+   googling before a call). HARD RULE: outbound queries may contain ONLY name/company - never
+   calendar description text, never corpus or Granola content. Every outbound query is logged;
+   the format check audits the log.
+4. CALENDAR PHYSICS as named rules + day-one fixtures in the gate: recurring (UID+occurrence),
+   all-day events excluded, rescheduled-after-prep -> one-line correction ping, cancelled ->
+   suppression, created-inside-window -> caught by the catch-up rule.
+5. GOAL-ASK never blocks: unanswered 21:00 ping -> dossier ships with "Goal (inferred,
+   unconfirmed):"; answers stored per-meeting; post-21:00 bookings skip to inference.
+6. EVAL BOOTSTRAP (low volume honesty): no judge in the near plan (20 labels = months at this
+   frequency). Day one: format contract at send, poller dead-man, did-it-look invariants
+   (corpus-search called; Granola called when prior meetings exist), outbound-query log audit,
+   and ONE SHADOW WEEK (dossiers to log only) before live delivery.
+7. LINKEDIN EXPECTATION: snippets only (no API); fallback chain = Exa people-search, company team
+   page, personal site, GitHub, conference bios, Crunchbase via Firecrawl. Dossier labels the
+   limit explicitly ("LinkedIn: headline only").
+8. MODEL: Sonnet at launch (tool-orchestration untested on cheap models - the bake-off qualified
+   single-shot judgment only). Prep gets its OWN bake-off once shadow-week checks + verdicts
+   exist. (Daniel's ruling: every agent gets tested on ITS OWN job before model swaps.)
