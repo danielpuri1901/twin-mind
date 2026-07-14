@@ -44,6 +44,20 @@ try:
             subj = str(make_header(decode_header(msg.get("Subject", ""))))
             if not re.match(r"^Morning brief - [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$", subj):
                 fails.append(f"subject breaks contract: '{subj}'")
+            # v3: the date in the subject must be TODAY (Daniel caught a wrong date in a mockup)
+            want = today.strftime("%a %-d %b")
+            if want not in subj:
+                fails.append(f"subject date wrong: says '{subj}', today is {want}")
+            if "°C" not in (body or "") and "rain" not in (body or "").lower():
+                fails.append("weather line missing (v3 contract)")
+            try:
+                cov = open(os.path.expanduser("~/.hermes/state/digest-covered.txt")).read()
+                first_words = [l.split("(")[0].strip()[:25] for l in cov.splitlines() if len(l) > 15]
+                hits = [t for t in first_words if t and t.lower() in (body or "").lower()]
+                if hits:
+                    fails.append(f"covered topic repeated: {hits[:2]}")
+            except Exception:
+                pass
             missing = [h for h in HEADERS if h not in (body or "")]
             if missing:
                 fails.append(f"missing sections: {', '.join(missing)}")

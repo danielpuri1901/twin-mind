@@ -33,8 +33,10 @@ def _load_production_rules():
     PRODUCTION text, not a paraphrase (stepback #5: 'the gate evaluated a prompt
     that is not the one in production')."""
     skill = open(os.path.join(HERE, "agents/brief/SKILL.md")).read()
-    start = skill.index("Rules:")
-    block = skill[start:start + 2000].split("\n\n")[0]
+    # v3 anchor: the decision rules live inside section 1 (NEEDS YOU TODAY)
+    start = skill.index("1. NEEDS YOU TODAY")
+    end = skill.index("2. TODAY")
+    block = "Rules (from the production skill, section 1):\n" + skill[start:end]
     return ("You are Twin Mind, deciding for each email: does Daniel need to act on this or not.\n"
             + block +
             "\nGiven the evidence, produce:\n"
