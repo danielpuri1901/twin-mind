@@ -1,6 +1,30 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-14 (night) - v3 shipped, judge calibrated, bake-off run, second agent specced
+- BRIEF v3 LIVE for tomorrow 07:30: designed WITH Daniel (act-fast core: one-liners no drafts;
+  weather; conversation-driven teacher w/ answers; dedupe enforced; open-loops dropped), built as
+  deterministic prefetch (state-flagged inbox, noise tier, Open-Meteo) + prose-only agent + v3
+  watchdog (subject-date, Answer-line, weather, dedupe checks). Cron carries the script stage.
+- REPO RESTRUCTURED agent-shaped: agents/{brief,chat}, shared/, evals/, pipeline/. Leanness law in
+  CLAUDE.md. Box skills: 4 governed only (18 bundled archived). Gate stayed green through the move.
+- JUDGE CALIBRATED: 64% -> 80% in one rubric iteration vs Daniel-endorsed labels (62); remaining
+  disagreements = instrument-scope (staleness->regression suite, answer-line->watchdog). Judge
+  caught one wrong label ([7] Dan Luu repeat). calibrate_judges.py is the standing harness.
+- MODEL BAKE-OFF (regression eliminator): Sonnet 9/9, Haiku 9/9, gpt-oss-20b 9/9 (!), 120b 8/9 DQ,
+  Nova-2-Lite 0/9 (floor = format compliance). Haiku 3-day brief trial starts Jul 16 (one variable
+  at a time; verdicts referee). OPEN: 20b prose benchmark failed 3x (args/env/HTML error) - rerun
+  FOREGROUND with full stderr before judging its prose; does not block Haiku trial.
+- SECOND AGENT SPECCED: agents/background-prep (dossiers ~1h before professional calls).
+  Brainstormed with Daniel (Telegram T-60, mechanical scope filter, infer-goal-ask-when-thin,
+  half-page). Hostile stepback adopted: idempotent catch-up poller (no one-shot machinery),
+  attendee-not-organizer heuristic, personal-circle day one, outbound-query privacy rule + log,
+  calendar-physics fixtures in the gate, shadow week, Sonnet at launch. Gate zero PASSED (ICS
+  carries ATTENDEE/ORGANIZER/DESCRIPTION). Principle recorded: every agent is tested on ITS OWN
+  job before model swaps.
+- QA-gold minted (24 items, Daniel's prose-style labels; AM = TAX dept agents, internship ends
+  Sep 9 - major fact corrections propagated to wiki).
+
 ## 2026-07-14 (evening) - stepback #6: refocus, green gate, freeze list
 - RED GATE resolved per cold ruling: regression pass = code grader AND every assertion; the judge's
   holistic "overall" bit DELETED (a vibe layered on a deterministic pass; flicker was grader skew
