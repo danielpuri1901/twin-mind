@@ -1,6 +1,19 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-14 (evening) - stepback #6: refocus, green gate, freeze list
+- RED GATE resolved per cold ruling: regression pass = code grader AND every assertion; the judge's
+  holistic "overall" bit DELETED (a vibe layered on a deterministic pass; flicker was grader skew
+  from the jargon-rename, not a regression). 9/9 green; inbox-decisions renames landed; deployed.
+- Collaboration rules adopted (in CLAUDE.md): one-consolidated-ask when human input blocks >24h;
+  Daniel timeboxes label sessions like meetings.
+- CRITICAL PATH (5 steps): [1] gate green DONE -> [2] Daniel's 35-min label session -> [3] calibrate
+  shadow judges vs labels -> [4] five-model bake-off -> [5] Session B brief workflow-ification.
+- FROZEN: Session C hardening (except Daniel's 10-min interactive credential run) until bake-off
+  ships; cross-run memory beyond digest-covered until Session B; teacher-gold until a real drill
+  session produces material; fine-tune until 50+ labels AND post-Aug 6.
+- DROPPED: further naming passes until September; datasets/-move + folder-rename cosmetics.
+
 ## 2026-07-13 - the twin's secret diary
 - INCIDENT: brief showed Sam/Postral meeting at 17:00; real time 19:00. Root cause: calendar_read
   stripped ICS timezones (the Z suffix) - not a hallucination; the model faithfully relayed bad tool
