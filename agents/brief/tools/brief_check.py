@@ -111,11 +111,17 @@ except Exception as e:
 try:
     skills_dir = os.path.expanduser("~/.hermes/skills")
     if os.path.isdir(skills_dir):
+        # 2026-07-14 pm: the gateway re-materializes its bundled skills on restart
+        # (.bundled_manifest, dirs reappeared 13:25 after the morning archive), so
+        # "symlinks only" is unenforceable. New rule: a real directory is rogue only
+        # if it is NOT in the gateway's own bundled manifest.
+        bundled = set()
+        mf = os.path.join(skills_dir, ".bundled_manifest")
+        if os.path.exists(mf):
+            bundled = {l.split(":")[0].strip() for l in open(mf) if l.strip()}
         rogue = [d for d in os.listdir(skills_dir)
-                 if not os.path.islink(os.path.join(skills_dir, d)) and not d.startswith(".")]
-        # bundled skills archived 2026-07-14 (dead-simple ruling): active dir holds
-        # ONLY our 4 governed symlinks - any real directory here is unauthorized.
-
+                 if not os.path.islink(os.path.join(skills_dir, d))
+                 and not d.startswith(".") and d not in bundled]
         if rogue:
             fails.append(f"UNAUTHORIZED twin-authored skill(s) appeared: {rogue}")
 except Exception as e:

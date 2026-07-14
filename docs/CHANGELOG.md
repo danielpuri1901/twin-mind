@@ -1,6 +1,81 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-14 (later) - granola transcript ingest BUILT, gate-green
+- pipeline/fetch_granola.py BUILT: Mac-side 15-min poller, the post-call mirror of background-prep.
+  Path-2 auth chain lifted verbatim from the proven granola_path2_decrypt.py (Keychain -> storage.dek
+  -> DEK -> supabase.json.enc -> live Bearer). Lists /v2/get-documents, and for any NEW meeting whose
+  transcript is final saves the verbatim Me:/Them: transcript to raw/transcripts-inbox/, then normalize
+  + build_index inline. Deterministic, no LLM, no secrets ever printed or written.
+- Scope enforced (Daniel's ruling): first run BASELINES every current meeting (no file, never
+  backfilled); only meetings appearing after baseline are ingested. State: ~/.hermes/state/transcript-state.json
+  (seen doc ids + updated-timestamps + written filename). Saved doc whose updated-timestamp advances is
+  re-fetched and overwrites the same file; unchanged docs never re-fetched.
+- Speaker map: source microphone -> Me, everything else -> Them (strict, all the normalizer reads today).
+  Finality gate: segments exist AND tail is_final; a still-transcribing meeting stays pending and is
+  re-checked next poll (no half-written file). Any fetch/parse failure is counted AND printed, never hidden.
+- Failure doctrine: decrypt/Keychain failure SCREAMS (prints loud, skips heartbeat so the dead-man fires,
+  exits 1); a 401 is the soft "app not running" state (retry next poll). Heartbeat is two-way: local
+  timestamp file (authoritative Mac-side, weekly-review checks staleness) + best-effort CloudWatch
+  TranscriptPollerRan. Reindex runs under a non-blocking flock so it never overlaps a manual corpus refresh.
+- normalize_transcripts.py: one-line SOURCES add (raw/transcripts-inbox/*.md) - wires in the inbox AND
+  finally the hand-pasted tiffany file (14 turns). Verified without mutating the real corpus.
+- 33 GRANOLA-INGEST FIXTURES born into the gate (evals/test_granola_fetch.py, wired into eval.sh next to
+  test_prep_scan.py): baseline scope + freeze/no-backfill, idempotence, update re-fetch (same file reused),
+  finality gating, speaker mapping, parse-failure honesty, failed-doc retry. Injected at the fetch boundary
+  so no test touches network or Keychain. Gate GREEN (26 prep + 33 granola fixtures + 9/9 regression).
+- launchd LaunchAgent staged: infra/com.twinmind.granola-transcript-poller.plist (15-min, RunAtLoad,
+  logs to ~/.hermes/logs/granola-poller.{out,err}.log). NOT loaded - install one-liner handed to Daniel.
+- DEVIATION from spec: reindex runs normalize + build_index (FTS, free, local) inline, but NOT the Bedrock
+  embed step - it rebuilds the whole vectors.db over the network and costs money every poll (a 15-min-poller
+  cost trap that also couples ingestion to AWS). New meetings are keyword-searchable within minutes; vectors
+  catch up on the existing weekly Mac->box refresh. Incremental append-embed noted as the future optimization.
+
+## 2026-07-14 (late night) - background-prep BUILT, gate-green, deploy staged
+- AGENT #2 BUILT per spec v2: agents/background-prep/{SKILL.md (dossier contract, cite-or-refuse,
+  privacy query rule + query log), JOB.md, tools/scan_meetings.py (15-min no-agent poller: ICS
+  physics, circle/video-link scope filter, 75-min idempotent catch-up, 20-min claim lease, 21:00
+  goal-ask, PrepPollerRan heartbeat, shadow-flag file)}. personal_circle.txt seeded (manual on
+  purpose: contacts.jsonl has phones, not relationship-tagged emails).
+- Spec deviation recorded in JOB.md: no-agent poller can't invoke the model, so it schedules a
+  one-shot Sonnet cron; the spec's lost-prep objection is answered by the lease (stale claim
+  expires -> retry). Nothing can be silently dropped.
+- 15 CALENDAR-PHYSICS FIXTURES born into the gate (evals/test_prep_scan.py, wired into eval.sh):
+  Z-vs-TZID same instant, all-day/cancelled excluded, circle filter, video-link rule, folded
+  ATTENDEE, lease expiry, delivered idempotence, recurring keyed apart. All green first run.
+- SKILL-GUARD FIX along the way: gateway re-materializes bundled skill dirs on restart
+  (.bundled_manifest, reappeared 13:25) - "symlinks only" unenforceable; guard now allows
+  manifest-listed dirs only. Would have false-alarmed the 07:50 watchdog on day one of v3.
+- Gate GREEN (fixtures + 9/9 regression). Deploy payload staged; box push HELD pending Daniel's
+  answer on the Fargate question (asked mid-deploy). Shadow week starts at deploy.
+- Agent card artifact published (scope/access/middleware/model/evals/det-vs-agentic/stack fit).
+- PRE-PROD EVAL built (Daniel's ask) and it PAID immediately: evals/run_prep_bench.py --scope
+  replays the filter over the REAL feed (27 events/30d). Caught 3 prod bugs before prod:
+  (1) recruiter as ORGANIZER-only never counted (Growth Protocol interview would have had NO
+  prep), (2) Meet link lives in X-GOOGLE-CONFERENCE/LOCATION not DESCRIPTION, (3) mirrored
+  invites (same start+link) would double-dossier. All fixed + 6 new fixtures; gate 21/21 green.
+  --pick 8 selects past real meetings for the [BENCH] dossier run through the real harness;
+  Daniel's verdicts on those = prep-labels.jsonl golden set, born before launch.
+- DANIEL'S GO + scope ruling ("any meeting is important" - err inclusive, circle starts empty,
+  recorded in JOB.md). DEPLOYED: files+symlink+shadow flag+watchdog fix on the box, prep-poller
+  cron */15 live (first tick 17:15), PrepPollerRan seeded + 3h dead-man alarm (in
+  recreate-monitoring.sh), 8 [BENCH] one-shots fired 17:10-17:38 on real past meetings
+  (Chainfill, LangChain, Nik, Roxi, Postral, Spiros, 2x AWS interviews). Cron-create quoting
+  lesson: positional prompt dies in nested bash -lc; pass args directly to sudo.
+  Tonight 18:45: first organic shadow prep (Sam/Postral 20:00).
+- BENCH VERDICTS 1-5 (Daniel, live): 1-3 good (Chainfill/LangChain/take-home; LangChain dossier
+  reconstructed the full 4-round pipeline + rejection reason from Granola). Two findings became
+  fixes, both gate-green (26/26) + deployed:
+  (1) NIK DOSSIER RENDERED AS BLUE HTML - root cause: gateway delivers final Telegram msg as
+  MarkdownV2 (cli-config.yaml.example:634); brief was immune only because it is EMAIL. Dossier had
+  no plain-text contract so a run formed a valid MarkdownV2 entity. Fix: hard PLAIN-TEXT rule in
+  SKILL (no markup, no < >, rewrite 'X <-> Y' to 'X / Y', no em dash, straight quotes).
+  (2) INTERVIEW GOAL 'impossible to infer' cold - added deterministic is_interview() (title words
+  + ATS/recruiter domains) -> passes 'MEETING TYPE: interview' so the candidate frame + fixed goal
+  hold even with zero corpus history. 5 fixtures. Roxi dossier SELF-FLAGGED personal (spotted
+  'Ma Corla' Spanish endearments) - scope self-correction working; circle candidate.
+  prep-labels.jsonl now 6 rows (the golden set, growing from live verdicts).
+
 ## 2026-07-14 (night) - v3 shipped, judge calibrated, bake-off run, second agent specced
 - BRIEF v3 LIVE for tomorrow 07:30: designed WITH Daniel (act-fast core: one-liners no drafts;
   weather; conversation-driven teacher w/ answers; dedupe enforced; open-loops dropped), built as

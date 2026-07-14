@@ -1,0 +1,5 @@
+# personal_circle.txt - emails whose meetings are PERSONAL (never prepped, never researched)
+# One address per line. Deployed to ~/.hermes/state/personal_circle.txt.
+# Daniel's own address is excluded in code; no need to list it.
+# Seeding is manual on purpose: contacts.jsonl has phones, not relationship-tagged emails.
+# During shadow week: every [SHADOW] dossier about a friend/family member = add their address here.

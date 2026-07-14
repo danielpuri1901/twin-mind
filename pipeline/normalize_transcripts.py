@@ -21,6 +21,7 @@ SOURCES = (
     + glob.glob(os.path.join(CAREER, "Langchain/prep/*GROUND-TRUTH*.md"))
     + [os.path.join(CAREER,
        "career-ops/interview-prep/granola-notes/robert-christine-takehome-review-2026-06-29.md")]
+    + glob.glob(os.path.join(HOME, "twin-corpus/raw/transcripts-inbox/*.md"))
 )
 OUTDIR = os.path.join(HOME, "twin-corpus", "normalized")
 OUT = os.path.join(OUTDIR, "transcripts.jsonl")

@@ -7,6 +7,10 @@ cd "$(dirname "$0")/.."
 PY="$HOME/.hermes/hermes-agent/venv/bin/python"
 echo "== tool regression tests (deterministic, free) =="
 python3 evals/test_tools.py
+echo "== background-prep calendar physics (deterministic, free) =="
+python3 evals/test_prep_scan.py
+echo "== granola transcript ingest (deterministic, free) =="
+python3 evals/test_granola_fetch.py
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" evals/run_regression.py --trials 3
 if [ "$1" = "--full" ]; then

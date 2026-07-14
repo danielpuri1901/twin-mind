@@ -15,4 +15,9 @@ aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-watchdog-dead
   --namespace TwinMind --metric-name WatchdogRan --statistic Sum \
   --period 86400 --evaluation-periods 1 --threshold 1 \
   --comparison-operator LessThanThreshold --treat-missing-data breaching --alarm-actions "$TOPIC"
-echo "monitoring recreated: 2 metrics, 2 dead-man alarms, 1 topic"
+aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-prep-poller-deadman \
+  --alarm-description "background-prep poller has not run in 3h (should tick every 15 min)" \
+  --namespace TwinMind --metric-name PrepPollerRan --statistic Sum \
+  --period 10800 --evaluation-periods 1 --threshold 1 \
+  --comparison-operator LessThanThreshold --treat-missing-data breaching --alarm-actions "$TOPIC"
+echo "monitoring recreated: 3 metrics, 3 dead-man alarms, 1 topic"

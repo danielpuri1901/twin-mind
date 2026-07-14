@@ -103,3 +103,34 @@ Mac (corpus factory): iMessage export -> normalize -> wiki compile -> rsync to b
 4. The eval ambient layer: invariant suite over traces, online judge, correction auto-capture.
 5. When exports land: WhatsApp/Meta/Discord/TikTok -> normalize -> wiki v3.
 6. Earned-later: coach cadence, approved-external-send path, Groq voice on box, fine-tune experiment (the "twin brain").
+
+## Chapter 7 - Two agents in one day, and the eval that paid for itself (Jul 14)
+
+The day started with a model question and ended with two new production agents.
+
+First we settled the model.
+A bake-off had been run across five models, but on the wrong ruler: the old 32-pair drafting-gold set, for a job (drafting replies) we no longer do.
+Daniel caught it in plain words: the evals were measuring a cancelled job, so their verdict was worthless.
+We built the right ruler instead - run_brief_bench.py, which feeds a real prefetch fixture and the real skill to each candidate and scores with Daniel-calibrated judges.
+On that ruler the answer flipped: Sonnet 5/5, Haiku buried the AWS alarm and invented a nudge that never happened, gpt-oss hallucinated freely.
+Sonnet is the go-to. The drafting-gold set was deleted, and a rule went into the ground truths: evals measure the ACTUAL job, datasets for dead jobs are deleted not repurposed.
+
+Then we built background-prep, agent number two.
+Before any professional meeting, a half-page dossier lands on the phone: who, their company, what happened last time, the goal, two opening questions.
+It follows the repo law - three files of its own (SKILL, JOB, the poller) and everything else inherited: middleware, Telegram delivery, the watchdog pattern, the heartbeat alarm, the gate.
+The split is the doctrine: code decides WHEN (ICS physics, scope filter, the 75-minute idempotent catch-up with a 20-minute lease so a crashed prep retries), the model decides WHAT (which facts matter, the goal, the questions).
+
+The best decision of the day was Daniel's: eval before prod.
+run_prep_bench.py --scope replays the scope filter over the real calendar, 27 real meetings, and asks Daniel to correct it.
+It paid immediately - three real bugs caught before production: a recruiter who appears only as ORGANIZER would have gotten no prep, a Meet link that lives in X-GOOGLE-CONFERENCE not DESCRIPTION, and mirrored invites that would double-send.
+None of the hand-built fixtures would ever have found those; only the real feed could.
+Then --pick 8 ran eight real past meetings through the real harness, and Daniel verdicted each one.
+All eight good. Two findings became fixes mid-flight: the first Telegram long-form content revealed that the gateway renders final messages as MarkdownV2 (the brief was immune only because it is email), so a dossier now must be strict plain text; and interview goal inference, impossible cold, became deterministic via title-words and recruiter domains.
+The eight verdicts are prep-labels.jsonl - a golden set born before the agent ran a single live prep, exactly the point.
+
+In parallel a subagent built the third piece: Granola transcript ingest.
+The old plaintext-token trick died in May when Granola encrypted local storage; the new path decrypts through the Keychain DEK, proven end-to-end.
+fetch_granola.py is the post-call mirror of background-prep - same 15-minute cadence, same silent-when-healthy doctrine - and it feeds the corpus that background-prep reads from. The two halves of one meeting.
+
+The pattern held all day: the gate stayed green through every change (26 prep fixtures + 33 granola fixtures + 9/9 regression), every real failure became a fixture the same hour, and the human stayed the ground truth.
+Two agents, one golden dataset, zero production incidents - because the ruler came first.
