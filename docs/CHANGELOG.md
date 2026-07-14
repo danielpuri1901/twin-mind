@@ -41,7 +41,7 @@ One dated entry per working session. Newest on top. The full narrative lives in 
 ## 2026-07-08 - Session A complete: the evals RUN
 - Deployed to box: SOUL time rule, inbox cursor + coverage contract, digest section ("one technical thing" daily, interview-gap queue leads), 8 learning-wiki files. Gateway restarted.
 - FIRST regression suite run: tools/run_triage.py (3 tasks x 3 trials, code+judge graders, tracked metrics) -> 9/9 PASS. Baseline established.
-- tools/eval.sh = the ship gate; CLAUDE.md rule: no skill/prompt/model change ships without it green.
+- evals/eval.sh = the ship gate; CLAUDE.md rule: no skill/prompt/model change ships without it green.
 - Research trio audited (Anthropic evals + BEA, OpenAI guide, 12-Factor): ~85% aligned; fix plan at docs/plans/2026-07-08-compliance-fix-plan.md (Session B: brief workflow-ification; Session C: hardening).
 - Interview retrace: verbatim misses filed + Tiffany debrief transcript in corpus; Robert window ~Aug 6 (Daniel's own request, confirmed by mailbox read); triage-03 minted from the brief's missed-reply error.
 

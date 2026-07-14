@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 build_index.py - build the SQLite FTS5 index over normalized corpus records.
-Consumed only through the corpus-search contract (tools/corpus_search.py).
+Consumed only through the corpus-search contract (shared/corpus_search.py).
 """
 import glob
 import json

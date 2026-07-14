@@ -32,7 +32,7 @@ def _load_production_rules():
     """Extract the decision rules FROM the deployed skill so the gate tests the
     PRODUCTION text, not a paraphrase (stepback #5: 'the gate evaluated a prompt
     that is not the one in production')."""
-    skill = open(os.path.join(HERE, "skills/morning-brief/SKILL.md")).read()
+    skill = open(os.path.join(HERE, "agents/brief/SKILL.md")).read()
     start = skill.index("Rules:")
     block = skill[start:start + 2000].split("\n\n")[0]
     return ("You are Twin Mind, deciding for each email: does Daniel need to act on this or not.\n"

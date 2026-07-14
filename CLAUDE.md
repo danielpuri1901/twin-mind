@@ -14,16 +14,24 @@ Design: `docs/2026-06-30-twin-mind-design.md` · Build plan: `docs/gameplan.md` 
 - **Corpus, two-tier (approved 2026-07-02):** raw data stays on the Mac, encrypted, NEVER pushed or synced anywhere. Only the derived working set (wiki/ + corpus.db + normalized/) deploys, point-to-point over SSM, to the box's encrypted EBS. Nothing corpus-related ever touches S3, git remotes, or third-party storage. Common format: one record = `{source, date, who, text}`.
 - **Active window (2026-07-02):** the full corpus is memory (recall, facts, timeline); only the rolling last ~12 months defines voice exemplars, professional register, tendencies, coach baselines, and scorecard pairs. Older eras are context, never template.
 - **Corpus versioning:** ~/twin-corpus is a LOCAL-ONLY git repo (raw/ untracked; normalized/ + wiki/ snapshotted per refresh; pre-push hook hard-fails so it can never leave the machine).
-- **Retrieval contract:** all corpus access goes through the `corpus-search` CLI (shimmed on PATH; `tools/corpus_search.py`: query -> JSON lines). Backends: FTS5 + Cohere-multilingual-v3 embeddings in sqlite-vec. **Default mode: hybrid** (bake-off verdict 2026-07-03); drafting retrieval is audience-conditional. Skills and evals call only the contract.
+- **Retrieval contract:** all corpus access goes through the `corpus-search` CLI (shimmed on PATH; `shared/corpus_search.py`: query -> JSON lines). Backends: FTS5 + Cohere-multilingual-v3 embeddings in sqlite-vec. **Default mode: hybrid** (bake-off verdict 2026-07-03); drafting retrieval is audience-conditional. Skills and evals call only the contract.
 - **Build order:** validate the whole twin ON THE MAC (index, wiki, gold pairs, local Hermes vs Bedrock) before creating any AWS resource beyond CLI auth + Bedrock access. AWS is lift-and-shift of a known-good config.
 - **Channel (final, 2026-07-02):** Telegram = interactive home (official Bot API - stable for years, zero ban risk, free proactive, not blocked at work). Morning brief = real email send via Daniel's Gmail (SMTP app password, send-only; NEVER the Hermes email gateway adapter on his personal inbox - it marks all mail seen and polls). Discord dropped (blocked at work); WhatsApp Baileys optional later as a parallel channel (unofficial bridge: re-pairing + ban risk documented).
 - **Eval-first:** build the scorecard before tuning anything. Nothing "improves" the twin unless it beats the scorecard.
 - **Online-eval doctrine (2026-07-12):** we follow `docs/eval-doctrine.md` (two LangChain articles translated to n=1): deterministic checks on everything, calibrated judges, verdicts->dataset within a day, weekly review queue.
-- **Ship gate (mechanized 2026-07-08):** no change to skills, SOUL, tools, prompts, or model tier ships to the box without `tools/eval.sh` green (triage regression at 100%). Baseline: 9/9 PASS on first run, 2026-07-08.
+- **Ship gate (mechanized 2026-07-08):** no change to skills, SOUL, tools, prompts, or model tier ships to the box without `evals/eval.sh` green (triage regression at 100%). Baseline: 9/9 PASS on first run, 2026-07-08.
 - **Autonomy by reversibility:** act autonomously on read / search / research / draft; require human approval for send / spend / commit / anything irreversible.
 - **Cost discipline:** credits go to compute (Bedrock + a one-off GPU for the fine-tune), not storage. Stop GPUs the moment a run ends. No idle managed services.
 
 - **Bottleneck rules (stepback 2026-07-14):** when a human input blocks the critical path >24h, Claude's next session opens with ONE consolidated ask (with time estimate) and builds nothing further on the blocked chain. Daniel timeboxes human-input tasks like meetings, or explicitly defers so work re-sequences.
+
+
+## Repo law: one folder per agent (2026-07-14)
+The repo is organized by product: `agents/<name>/` holds EVERYTHING that agent is (SKILL.md,
+OPERATIONS.md, its tools/, its JOB.md). `shared/` only for things two+ agents use (SOUL, corpus
+contract). `evals/` = the gate. `pipeline/` = Mac-only data prep. Nothing gets built outside an
+agent folder without naming which agent it serves. When in doubt: fewer files, flatter, closer
+to the agent.
 
 ## Engineering rules - how we make decisions here
 

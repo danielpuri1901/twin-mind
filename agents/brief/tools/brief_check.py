@@ -61,7 +61,7 @@ try:
             try:
                 import json as _json
                 cal = subprocess.run(["python3", os.path.expanduser(
-                    "~/super-project/tools/calendar_read.py"), "--days", "1"],
+                    "~/super-project/agents/brief/tools/calendar_read.py"), "--days", "1"],
                     capture_output=True, text=True, timeout=60)
                 events = [_json.loads(l) for l in cal.stdout.splitlines() if l.strip()]
                 for ev in events:

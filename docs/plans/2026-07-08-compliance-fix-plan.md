@@ -9,7 +9,7 @@ go multi-agent, rewrite on LangGraph - all three sources say simplest-first; Her
 Fixes: evals-paper letter-compliance (suites that sit -> suites that run).
 1. Deploy to box (skills incl. digest section + SOUL time rule, patched tools, learning wiki).
 2. First-ever run of tools/run_triage.py (3 trials x 3 tasks; regression bar = 100%).
-3. tools/eval.sh: one command that runs the triage suite (and optionally gold-32) -> exit code.
+3. evals/eval.sh: one command that runs the triage suite (and optionally gold-32) -> exit code.
 4. CLAUDE.md rule: NO skill/prompt/model change ships without eval.sh green. This turns
    "eval-first" from intention into mechanism.
 DONE = triage suite has a baseline result in Langfuse; a failing item blocks a ship.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Where is the money going? One terminal answer. Usage: python3 tools/costs.py [--days 7]"""
+"""Where is the money going? One terminal answer. Usage: python3 evals/costs.py [--days 7]"""
 import argparse, base64, json, os, subprocess, urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone

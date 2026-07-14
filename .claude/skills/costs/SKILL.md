@@ -1,8 +1,8 @@
 ---
 name: costs
-description: Answer "where is my money going" for Twin Mind - run tools/costs.py and interpret
+description: Answer "where is my money going" for Twin Mind - run evals/costs.py and interpret
 ---
-Run: `python3 "tools/costs.py" --days 7` from the project root.
+Run: `python3 "evals/costs.py" --days 7` from the project root.
 
 Then answer in Daniel's shape: 2-4 plain sentences, no dashboard talk.
 - Lead with the total and the trend (rising/falling vs prior days).
