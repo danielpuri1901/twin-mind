@@ -7,7 +7,11 @@ Compose Daniel's morning brief and SEND it as ONE real email to danielpuri1901@g
 FORMAT CONTRACT (pinned 2026-07-10 - the rendering is NOT a creative choice; fill the template exactly):
 - Subject: exactly `Morning brief - {Weekday} {D} {Month}` (e.g. "Morning brief - Fri 10 Jul"). Plain hyphen. Never vary.
 - Section headers: exactly `1. NEEDS YOU TODAY`, `2. TODAY`, `3. AI ADVANCEMENTS`, `4. ONE TECHNICAL THING`, `5. COACH`, `6. OPEN LOOPS` - numbered, uppercase, no emoji in headers.
-- Separator between sections: a single blank line. No ═/──/=== art.
+- Section headers are FRAMED by heavy divider lines (the char ━ repeated ~29x), exactly:
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. NEEDS YOU TODAY
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  (Daniel's spec 2026-07-14. Use ━ U+2501 only - never the em dash —.)
 - Dashes: plain hyphen "-" everywhere. NEVER an em dash (Daniel's canon).
 - Items: "- " bullets; drafts indented as quoted blocks.
 - Facts per item: 2-4 maximum. Same density every day - consistency beats completeness.
@@ -18,6 +22,7 @@ Sections, in order:
 2. **Today** - calendar events with times and locations.
 3. **AI advancements** (2-3 items MAX) - not headlines, insights. Format per item: the idea in one sentence, why it matters in one sentence, and if relevant, one line tying it to Daniel's own projects (twin, fine-tune plan, ArcelorMittal bot). Sources to check: new Dwarkesh Podcast episodes, top HN AI/agents discussions, notable model/lab releases. Style example Daniel liked: "RLVR is why LLMs got great at coding/math - verifiable domains give clean reward signal; computer use lacks that, so progress there is slower. Ties to: your scorecard IS manufacturing verifiability."
 4. **One technical thing** - teach ONE item from `~/twin-corpus/wiki/learning/digest-queue.md`, picked by day-of-year modulo list length (stateless rotation). Format: the concept in 3-4 sentences, then the EXACT code in this system that embodies it (read and quote the real file via terminal, with path), then ONE quiz question Daniel should answer cold. Items 1-3 are the LangChain interview gaps (see wiki/learning/interview-retrace-langchain-final.md) - he must own them reflexively before the Robert rematch (~Sep). This section exists to combat prompting-without-learning; never skip or thin it.
+   AI-news dedupe (2026-07-14, after Sonnet 5 appeared daily: "enough"): before writing section 3, read ~/.hermes/state/digest-covered.txt; NEVER repeat a topic covered in the last 14 days. After sending, append today's item topics (one per line, with date) to that file.
 5. **Coach** (1 item) - one nudge from the coach backlog, spaced-repetition style: resurface a prior nudge if unacknowledged, else one new observation grounded in recent corpus evidence.
 6. **Open loops** (max 3) - from wiki/topics pages: commitments or threads going stale.
 

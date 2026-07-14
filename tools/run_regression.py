@@ -22,7 +22,7 @@ import argparse, json, os, re, sys, time
 import boto3
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GOLD = os.path.expanduser("~/twin-corpus/index/triage-gold.jsonl")
+GOLD = os.path.expanduser("~/twin-corpus/datasets/triage-gold.jsonl")
 REGION = "eu-west-1"
 MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
 JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate

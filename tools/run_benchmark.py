@@ -21,7 +21,7 @@ import boto3
 from langfuse import get_client
 
 HOME = os.path.expanduser("~")
-GOLD = os.path.join(HOME, "twin-corpus/index/gold-set.jsonl")
+GOLD = os.path.join(HOME, "twin-corpus/datasets/drafting-gold.jsonl")
 VOICE = os.path.join(HOME, "twin-corpus/wiki/voice-profile.md")
 SEARCH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus_search.py")
 MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")

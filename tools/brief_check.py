@@ -47,6 +47,8 @@ try:
             missing = [h for h in HEADERS if h not in (body or "")]
             if missing:
                 fails.append(f"missing sections: {', '.join(missing)}")
+            if (body or "").count("\u2501" * 10) < 8:
+                fails.append("section divider lines (\u2501) missing - Daniel's 07-14 format spec")
             if not re.search(r"Triaged \d+ messages since", body or ""):
                 fails.append("coverage line missing")
             if "—" in (body or "") + subj:
