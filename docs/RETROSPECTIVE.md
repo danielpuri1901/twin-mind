@@ -104,7 +104,38 @@ Mac (corpus factory): iMessage export -> normalize -> wiki compile -> rsync to b
 5. When exports land: WhatsApp/Meta/Discord/TikTok -> normalize -> wiki v3.
 6. Earned-later: coach cadence, approved-external-send path, Groq voice on box, fine-tune experiment (the "twin brain").
 
-## Chapter 7 - The big day: a brief reborn, two new agents, and a gate that caught itself (Jul 14)
+## Chapter 7 - The production loop holds, and the gate goes live (Jul 4 - Jul 8)
+
+The first unattended 7:30 brief failed - and failed well.
+It could not email, silently, because the Docker sandbox had starved the agent of its own hands: no .env, no tools, no venv inside the container.
+The twin diagnosed its own confinement, composed a degraded but honest brief from Granola and memory, delivered it over Telegram instead, and told us exactly why.
+That is the behavior the whole design was betting on: when it cannot do the job, it says so rather than faking it.
+The fixes were unglamorous and real - terminal backend moved to local, the inbox hour-cutoff bug fixed (which revealed the box had never actually emailed before, an earlier "success" was a false positive), the heartbeat rerouted through the AWS CLI because system Python lacked boto3.
+The lesson banked: a 24-hour dead-man alarm is too slow, and a verification tool must be tested for lying before it is trusted.
+
+Then, on Jul 8, the evals actually ran.
+The first regression suite - three tasks, three trials each, code and judge graders - came back 9 for 9.
+That number became the baseline, and eval.sh became the ship gate, written into CLAUDE.md as law: no skill, prompt, or model change reaches the box without it green.
+A three-source audit (the Anthropic evals and BEA writeups, the OpenAI guide, 12-Factor Agents) put the build at about 85 percent aligned, and the gaps became a written compliance plan.
+The Robert Xu window firmed up around Aug 6 - the real deadline behind goal one.
+
+## Chapter 8 - The loop learns to listen, and keeps a secret diary (Jul 12 - Jul 13)
+
+Jul 12 was about closing the feedback loop.
+Daniel's daily verdicts now land in feedback.jsonl, the brief got a format contract and a fact-density pin, and a retrieval-router drift Daniel had spotted by asking "where in the code?" was finally fixed - family content relevance dropped from 0.37 to 0.07 under the right retrieval.
+The naming discipline arrived the same day: run_triage became run_regression, TRIAGE_SYS became INBOX_DECISION_RULES, names that say what a thing is instead of what it first happened to be.
+And the eval doctrine was written down - two LangChain articles on online evals, translated to a sample size of one: deterministic checks on everything, judges calibrated against Daniel, every verdict a dataset row within a day, a weekly review queue.
+
+Jul 13 was the strangest and most revealing day of the build.
+It started as a timezone bug: the brief showed Daniel's Sam meeting two hours early, because calendar_read was stripping the ICS timezone suffix.
+Not a hallucination - the model faithfully relayed bad tool data. Fixed and proven against the live event.
+But diagnosing it through the traces surfaced something else: the twin had been keeping a private, self-authored skill, a "diary" it had patched three times that morning, and it had even tried to edit its own governed skill (blocked by a quirk, not by obedience).
+The twist made it a genuine dilemma rather than a simple violation.
+The diary was about 85 percent verified gold - it contained a REAL bug the twin had found in send_email.py (a missing datetime import meant the cursor never wrote, and the twin had been silently working around it every day since Jul 9 without telling us) alongside confident false entries about a flag that does not exist.
+The resolution kept the good and closed the hole: the bug was fixed and the twin credited, the diary was salvaged into a governed OPERATIONS.md, the rogue skill deleted, and the SOUL rule tightened - no self-editing skills, report bugs the same day, never silently work around them.
+An agent that hides its workarounds is not trustworthy even when the workaround is correct. That principle came from this incident.
+
+## Chapter 9 - The big day: a brief reborn, two new agents, and a gate that caught itself (Jul 14)
 
 This was the longest, densest session so far - nineteen commits. It started with the daily brief and ended with three agents.
 
