@@ -99,10 +99,9 @@ try:
     if os.path.isdir(skills_dir):
         rogue = [d for d in os.listdir(skills_dir)
                  if not os.path.islink(os.path.join(skills_dir, d)) and not d.startswith(".")]
-        governed_or_bundled = {"apple","autonomous-ai-agents","computer-use","creative","data-science",
-            "dogfood","email","github","media","mlops","note-taking","productivity","research",
-            "smart-home","social-media","software-development","yuanbao"}
-        rogue = [d for d in rogue if d not in governed_or_bundled]
+        # bundled skills archived 2026-07-14 (dead-simple ruling): active dir holds
+        # ONLY our 4 governed symlinks - any real directory here is unauthorized.
+
         if rogue:
             fails.append(f"UNAUTHORIZED twin-authored skill(s) appeared: {rogue}")
 except Exception as e:
