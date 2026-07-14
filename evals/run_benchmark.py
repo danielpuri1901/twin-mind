@@ -18,6 +18,13 @@ import subprocess
 import sys
 
 import boto3
+# load .env ourselves - a keyless Langfuse constructs DISABLED (no .api) and
+# crashes cryptically (learned 2026-07-14: the error says attribute, means credentials)
+import os as _os
+for _line in open(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), ".env")):
+    if "=" in _line and not _line.strip().startswith("#"):
+        _k, _v = _line.strip().split("=", 1)
+        _os.environ.setdefault(_k, _v)
 from langfuse import get_client
 
 HOME = os.path.expanduser("~")
