@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Regression suite: proves the twin still avoids every mistake it has made in production.
-Current items are inbox-triage judgments (dataset: twin-triage-v1); more failure classes join as they occur.
+Current items are inbox decisions (does this message need action from Daniel?) (dataset: twin-triage-v1); more failure classes join as they occur.
 
 Anatomy (Anthropic "Demystifying evals for agents", adopted 2026-07-08):
-  task  = one triage-gold.jsonl item (evidence bundle -> expected judgment)
+  task  = one inbox-decisions-gold.jsonl item (evidence bundle -> expected judgment)
   trial = one model attempt; TRIALS=3 because n=1 conflates variance with change
   graders per task:
     1. code-based   : output must carry an explicit "ACTIONABLE: yes|no" verdict
@@ -22,7 +22,7 @@ import argparse, json, os, re, sys, time
 import boto3
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GOLD = os.path.expanduser("~/twin-corpus/datasets/triage-gold.jsonl")
+GOLD = os.path.expanduser("~/twin-corpus/datasets/inbox-decisions-gold.jsonl")
 REGION = "eu-west-1"
 MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
 JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
@@ -46,9 +46,9 @@ INBOX_DECISION_RULES = _load_production_rules()
 
 JUDGE_SYS = """You are a strict evaluator. Given a triage DECISION and a list of GOLD ASSERTIONS
 describing correct behavior, return JSON only:
-{"assertions": [{"assertion": "...", "pass": true|false, "why": "..."}], "overall": true|false}
-"overall" is true only if the decision's substance would lead to the same brief content as the
-EXPECTED OUTPUT. Judge substance, not wording."""
+{"assertions": [{"assertion": "...", "pass": true|false, "why": "..."}]}
+Judge each assertion on substance, not wording. Do NOT return any holistic verdict -
+assertions only (ruling 2026-07-14: specific and auditable beats vibes)."""
 
 
 def claude(system, user, max_tokens=500, temperature=0.4, model=None):
@@ -86,7 +86,7 @@ def main():
     ap.add_argument("--trials", type=int, default=3)
     args = ap.parse_args()
     items = [json.loads(l) for l in open(GOLD)]
-    print(f"twin-triage regression: {len(items)} tasks x {args.trials} trials\n")
+    print(f"inbox-decisions regression: {len(items)} tasks x {args.trials} trials\n")
     suite_pass = True
     for item in items:
         user = (f"SCENARIO:\n{item['input']['scenario']}\n\nAVAILABLE SOURCES:\n"
@@ -96,11 +96,12 @@ def main():
             decision, lat, toks = claude(INBOX_DECISION_RULES, user)
             ok_code, code_why = code_grader(decision, item["expected_output"])
             verdict = model_grader(item, decision)
-            ok = ok_code and verdict.get("overall", False)
+            asserts = verdict.get("assertions", [])
+            ok = ok_code and bool(asserts) and all(a.get("pass") for a in asserts)
             passes += ok
             failed = [a["assertion"] for a in verdict.get("assertions", []) if not a["pass"]]
             print(f"  {item['id']} trial {t+1}: {'PASS' if ok else 'FAIL'} "
-                  f"(code: {code_why}; judge: {verdict.get('overall')}"
+                  f"(code: {code_why}; assertions: {sum(bool(a.get('pass')) for a in asserts)}/{len(asserts)}"
                   f"{'; failed: ' + '; '.join(failed) if failed else ''}) "
                   f"[{lat:.1f}s, {toks} out-toks]")
         rate = passes / args.trials

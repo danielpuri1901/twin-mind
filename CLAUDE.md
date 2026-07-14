@@ -23,6 +23,8 @@ Design: `docs/2026-06-30-twin-mind-design.md` · Build plan: `docs/gameplan.md` 
 - **Autonomy by reversibility:** act autonomously on read / search / research / draft; require human approval for send / spend / commit / anything irreversible.
 - **Cost discipline:** credits go to compute (Bedrock + a one-off GPU for the fine-tune), not storage. Stop GPUs the moment a run ends. No idle managed services.
 
+- **Bottleneck rules (stepback 2026-07-14):** when a human input blocks the critical path >24h, Claude's next session opens with ONE consolidated ask (with time estimate) and builds nothing further on the blocked chain. Daniel timeboxes human-input tasks like meetings, or explicitly defers so work re-sequences.
+
 ## Engineering rules - how we make decisions here
 
 - **Ground every AWS design decision in the official AWS docs, and cite the doc.** Never decide infrastructure from memory.
