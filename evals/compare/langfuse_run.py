@@ -14,6 +14,10 @@ os.environ.setdefault("LANGFUSE_HOST", os.environ.get("HERMES_LANGFUSE_BASE_URL"
 
 import eval_task as E
 from langfuse import Langfuse
+try:
+    from langfuse import Evaluation
+except ImportError:
+    from langfuse._client.datasets import Evaluation
 lf = Langfuse()
 
 
@@ -26,20 +30,23 @@ def push_brief_sections(limit):
     lf.flush()
 
 
+def _task(*, item, **kwargs):
+    return item.input["section"]  # passthrough; the LLM judging is in the evaluator
+
+
+def _judge_evaluator(*, input, output, expected_output, metadata=None, **kwargs):
+    verdict, reasoning = E.judge_section(input["brief_text"], input["section"])
+    return Evaluation(name="judge_agrees_daniel", value=E.judge_agrees(verdict, expected_output),
+                      comment=f"judge={verdict} daniel={expected_output} | {reasoning}")
+
+
 def run_brief_experiment(limit=24):
     push_brief_sections(limit)
-    dataset = lf.get_dataset("brief-sections")
-    n = 0
-    for item in dataset.items:
-        verdict, reasoning = E.judge_section(item.input["brief_text"], item.input["section"])
-        agree = E.judge_agrees(verdict, item.expected_output)
-        with item.run(run_name="brief-judge") as root:
-            root.update_trace(input=item.input, output={"verdict": verdict, "reasoning": reasoning})
-            root.score_trace(name="judge_agrees_daniel", value=agree,
-                             comment=f"judge={verdict} daniel={item.expected_output}")
-        n += 1
+    ds = lf.get_dataset("brief-sections")
+    result = lf.run_experiment(name="brief-judge", run_name="brief-judge",
+                               data=ds.items, task=_task, evaluators=[_judge_evaluator])
     lf.flush()
-    print(f"langfuse brief-judge run: {n} items scored")
+    print("langfuse brief-judge run:", getattr(result, "run_name", "done"))
 
 
 if __name__ == "__main__":
