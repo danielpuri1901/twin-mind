@@ -46,7 +46,29 @@ def run_experiment():
                     scores=[verdict_match], experiment_name="inbox-decisions")
 
 
+# --- LLM-as-judge scorer (the thing to clone + tweak in the Braintrust UI) ---
+def judge_agrees_daniel(input, output, expected, **kw):
+    verdict, reasoning = E.judge_section(input["brief_text"], input["section"])
+    return {"name": "judge_agrees_daniel", "score": E.judge_agrees(verdict, expected),
+            "metadata": {"judge": verdict, "daniel": expected, "reasoning": reasoning}}
+
+
+def run_brief_experiment(limit=24):
+    data = [{"input": {"section": r["section"], "brief_text": r["brief_text"]},
+             "expected": r["label"], "metadata": {"id": r["id"]}} for r in E.brief_sections(limit)]
+    braintrust.Eval(PROJECT, data=data, task=lambda inp: inp["section"],
+                    scores=[judge_agrees_daniel], experiment_name="brief-judge")
+
+
 if __name__ == "__main__":
-    push_datasets()
-    run_experiment()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--brief", action="store_true")
+    ap.add_argument("--limit", type=int, default=24)
+    a = ap.parse_args()
+    if a.brief:
+        run_brief_experiment(a.limit)
+    else:
+        push_datasets()
+        run_experiment()
     print("braintrust done ->", os.environ.get("BRAINTRUST_APP_URL"))

@@ -54,7 +54,42 @@ def run_experiment():
              experiment_prefix="inbox-decisions", client=c)
 
 
+# --- the LLM-as-judge evaluator (the thing to clone + tweak in the LangSmith UI) ---
+def push_brief_sections(limit):
+    ds = get_or_create("brief-sections")
+    rows = E.brief_sections(limit)
+    c.create_examples(
+        inputs=[{"section": r["section"], "brief_text": r["brief_text"], "subject": r["subject"]} for r in rows],
+        outputs=[{"label": r["label"]} for r in rows], dataset_id=ds.id)
+    print(f"langsmith brief-sections: {len(rows)} items")
+
+
+def brief_target(inputs):
+    return {"section": inputs["section"]}  # passthrough; the LLM judging happens in the evaluator
+
+
+def llm_judge(run, example):
+    verdict, reasoning = E.judge_section(example.inputs["brief_text"], example.inputs["section"])
+    return {"key": "judge_agrees_daniel",
+            "score": E.judge_agrees(verdict, example.outputs["label"]),
+            "comment": f"judge={verdict} | daniel={example.outputs['label']} | {reasoning}"}
+
+
+def run_brief_experiment(limit=24):
+    push_brief_sections(limit)
+    evaluate(brief_target, data="brief-sections", evaluators=[llm_judge],
+             experiment_prefix="brief-judge", client=c)
+
+
 if __name__ == "__main__":
-    push_datasets()
-    run_experiment()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--brief", action="store_true", help="run the LLM-judge brief experiment")
+    ap.add_argument("--limit", type=int, default=24)
+    a = ap.parse_args()
+    if a.brief:
+        run_brief_experiment(a.limit)
+    else:
+        push_datasets()
+        run_experiment()
     print("langsmith done - project twin-mind")

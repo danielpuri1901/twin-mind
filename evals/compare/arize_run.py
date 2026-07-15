@@ -73,8 +73,39 @@ def run_experiment():
     print(f"arize experiment: {'ok' if rc == 0 else 'FAIL'} {out[-200:]}")
 
 
+def run_brief_experiment(limit=24):
+    rows = E.brief_sections(limit)
+    # 1. create the brief-sections dataset (flattened, stable example_id)
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+        for r in rows:
+            f.write(json.dumps({"example_id": r["id"],
+                                "input": json.dumps({"section": r["section"], "brief_text": r["brief_text"]}),
+                                "expected_output": r["label"]}, ensure_ascii=False) + "\n")
+        dtmp = f.name
+    ax("datasets", "create", "--name", "brief-sections", "--space", SPACE, "--file", dtmp)
+    # 2. run the LLM judge locally, upload runs with the agreement score
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+        for r in rows:
+            verdict, reasoning = E.judge_section(r["brief_text"], r["section"])
+            f.write(json.dumps({"example_id": r["id"], "output": verdict,
+                                "judge_agrees_daniel": E.judge_agrees(verdict, r["label"]),
+                                "reasoning": reasoning}, ensure_ascii=False) + "\n")
+        rtmp = f.name
+    rc, out = ax("experiments", "create", "--name", "brief-judge",
+                 "--dataset", "brief-sections", "--space", SPACE, "--file", rtmp)
+    print(f"arize brief-judge experiment: {'ok' if rc == 0 else 'FAIL'} {out[-160:]}")
+
+
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--brief", action="store_true")
+    ap.add_argument("--limit", type=int, default=24)
+    a = ap.parse_args()
     ensure_profile()
-    push_datasets()
-    run_experiment()
+    if a.brief:
+        run_brief_experiment(a.limit)
+    else:
+        push_datasets()
+        run_experiment()
     print("arize done")
