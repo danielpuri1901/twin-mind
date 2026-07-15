@@ -23,7 +23,11 @@ def ax(*args, inp=None):
 
 
 def ensure_profile():
-    ax("profiles", "create", "default", "--api-key", os.environ["ARIZE_API_KEY"], "--auth-method", "api-key")
+    # EU account -> region eu-west-1a (US default 401s an EU key). create-or-update.
+    region = os.environ.get("ARIZE_REGION", "eu-west-1a")
+    ax("profiles", "create", "default", "--api-key", os.environ["ARIZE_API_KEY"],
+       "--auth-method", "api-key", "--region", region)
+    ax("profiles", "update", "default", "--api-key", os.environ["ARIZE_API_KEY"], "--region", region)
 
 
 def expected_of(r):
