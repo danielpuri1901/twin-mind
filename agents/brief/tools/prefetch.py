@@ -8,7 +8,7 @@ Emits a structured text block:
   inbox since cursor - noise-filtered (tier 1), state-annotated (tier 2):
   unread / already-replied / known-contact.
 """
-import email, imaplib, json, os, re, subprocess, sys, urllib.request
+import email, imaplib, json, os, re, subprocess, sys, time, urllib.request
 from datetime import datetime, timedelta
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
@@ -35,15 +35,27 @@ def out(title, body):
 
 
 def weather():
-    try:
-        u = ("https://api.open-meteo.com/v1/forecast?latitude=49.61&longitude=6.13"
-             "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
-             "&timezone=Europe%2FLuxembourg&forecast_days=1")
-        d = json.load(urllib.request.urlopen(u, timeout=15))["daily"]
-        return (f"Luxembourg: {d['temperature_2m_min'][0]:.0f}-{d['temperature_2m_max'][0]:.0f}°C, "
-                f"rain chance {d['precipitation_probability_max'][0]}%")
-    except Exception as e:
-        return f"(weather unavailable: {e})"
+    # Jul-15 2026: a single-shot request got a transient Open-Meteo 503 and the brief
+    # showed no weather. Now: retry with backoff, then fall back to a second source.
+    om = ("https://api.open-meteo.com/v1/forecast?latitude=49.61&longitude=6.13"
+          "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+          "&timezone=Europe%2FLuxembourg&forecast_days=1")
+    last = ""
+    for attempt in range(4):
+        try:
+            d = json.load(urllib.request.urlopen(om, timeout=15))["daily"]
+            return (f"Luxembourg: {d['temperature_2m_min'][0]:.0f}-{d['temperature_2m_max'][0]:.0f}°C, "
+                    f"rain chance {d['precipitation_probability_max'][0]}%")
+        except Exception as e:
+            last = str(e)
+            if attempt < 3:
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s
+    try:  # fallback so weather still shows if Open-Meteo is fully down
+        w = json.load(urllib.request.urlopen("https://wttr.in/Luxembourg?format=j1", timeout=15))["weather"][0]
+        return (f"Luxembourg: {w['mintempC']}-{w['maxtempC']}°C, "
+                f"rain chance {w['hourly'][4].get('chanceofrain', '?')}% (via wttr.in)")
+    except Exception as e2:
+        return f"(weather unavailable: open-meteo {last}; wttr {e2})"
 
 
 def known_contacts():
