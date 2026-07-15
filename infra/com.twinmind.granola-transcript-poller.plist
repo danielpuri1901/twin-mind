@@ -41,8 +41,19 @@
   <key>RunAtLoad</key>
   <true/>
 
+  <!-- Event-driven (2026-07-15): fire when Granola writes new meeting data to its
+       encrypted cache, instead of blind 15-min polling. cache-v6.json.enc updates on
+       meaningful state changes (a finished meeting's notes/transcript), NOT on every
+       tiny SQLite write, so this targets real activity. launchd throttles restarts to
+       >=10s apart, and the ingest is idempotent, so any extra fires are cheap no-ops. -->
+  <key>WatchPaths</key>
+  <array>
+    <string>/Users/danielpuri/Library/Application Support/Granola/cache-v6.json.enc</string>
+  </array>
+
+  <!-- safety net: even if a filesystem event is ever missed, catch up hourly -->
   <key>StartInterval</key>
-  <integer>900</integer>
+  <integer>3600</integer>
 
   <key>ProcessType</key>
   <string>Background</string>
