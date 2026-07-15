@@ -9,6 +9,8 @@ echo "== tool regression tests (deterministic, free) =="
 python3 evals/test_tools.py
 echo "== background-prep calendar physics (deterministic, free) =="
 python3 evals/test_prep_scan.py
+echo "== brief watchdog matches the brief format (anti-drift, free) =="
+python3 evals/test_brief_check.py
 echo "== granola transcript ingest (deterministic, free) =="
 python3 evals/test_granola_fetch.py
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
