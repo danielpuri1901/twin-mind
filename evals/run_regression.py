@@ -3,7 +3,7 @@
 Current items are inbox decisions (does this message need action from Daniel?) (dataset: twin-triage-v1); more failure classes join as they occur.
 
 Anatomy (Anthropic "Demystifying evals for agents", adopted 2026-07-08):
-  task  = one inbox-decisions-gold.jsonl item (evidence bundle -> expected judgment)
+  task  = one inbox-decision-answers.jsonl item (evidence bundle -> expected judgment)
   trial = one model attempt; TRIALS=3 because n=1 conflates variance with change
   graders per task:
     1. code-based   : output must carry an explicit "ACTIONABLE: yes|no" verdict
@@ -22,7 +22,7 @@ import argparse, json, os, re, sys, time
 import boto3
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GOLD = os.path.expanduser("~/twin-corpus/datasets/inbox-decisions-gold.jsonl")
+GOLD = os.path.expanduser("~/twin-corpus/datasets/inbox-decision-answers.jsonl")
 REGION = "eu-west-1"
 MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
 JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
@@ -46,11 +46,17 @@ def _load_production_rules():
 INBOX_DECISION_RULES = _load_production_rules()
 
 
-JUDGE_SYS = """You are a strict evaluator. Given a triage DECISION and a list of GOLD ASSERTIONS
-describing correct behavior, return JSON only:
-{"assertions": [{"assertion": "...", "pass": true|false, "why": "..."}]}
-Judge each assertion on substance, not wording. Do NOT return any holistic verdict -
-assertions only (ruling 2026-07-14: specific and auditable beats vibes)."""
+JUDGE_SYS = """You are a strict, fair evaluator. Given an inbox-decision DECISION and a list of GOLD
+ASSERTIONS describing correct behavior, judge whether the decision satisfies each assertion on
+SUBSTANCE, not wording. For each assertion, write your reasoning BEFORE the pass/fail (reason first,
+then commit to the verdict).
+<example>
+ASSERTION: "collapse each thread to its LATEST message before judging state"
+DECISION notes the reply already confirmed the plan, so no nudge -> why: judged on the newest message, loop closed; pass: true.
+DECISION reminds about the original ask, ignoring the later reply -> why: judged on a superseded message; pass: false.
+</example>
+Return JSON only, with why BEFORE pass on each: {"assertions": [{"assertion": "...", "why": "<reasoning>", "pass": true|false}]}
+Do NOT return any holistic verdict - assertions only (ruling 2026-07-14: specific and auditable beats vibes)."""
 
 
 def claude(system, user, max_tokens=500, temperature=0.4, model=None):

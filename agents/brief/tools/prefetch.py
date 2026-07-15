@@ -147,7 +147,7 @@ if __name__ == "__main__":
     text = buf.getvalue()
     print(text)
     try:  # fixture archive: every real morning becomes a benchmark input forever
-        fd = os.path.expanduser("~/twin-corpus/datasets/prefetch-fixtures")
+        fd = os.path.expanduser("~/twin-corpus/datasets/brief-inputs")
         os.makedirs(fd, exist_ok=True)
         open(os.path.join(fd, datetime.now().strftime("%Y-%m-%d") + ".txt"), "w").write(text)
     except Exception as e:

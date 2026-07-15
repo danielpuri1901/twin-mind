@@ -40,19 +40,25 @@ def format_score(brief):
     checks = 6
     return (checks - min(len(fails), checks)) / checks, fails
 
-JUDGE_SYS = """Judge this morning-brief draft section by section, "good"/"bad" each, per the calibrated standards:
+JUDGE_SYS = """You are a strict, fair judge of a morning-brief draft. Judge it section by section, "good"/"bad" each, per the calibrated standards. Reason FIRST from the evidence, THEN give the verdict.
 - triage: judge ONLY the document: clear one-liners (who/what/why-now), NO ready-to-send drafts (drafts = automatic bad), no contradictions.
 - ai_news: 2-3 genuine insights not headlines; must not repeat topics listed as already-covered in the INPUT DATA.
 - teacher: plain-words concept + real code path quoted + quiz. Judge teaching quality.
 - coach: concrete personal fact, no platitudes.
 - overall: readable fast, consistent, trustworthy.
-Return JSON only: {"triage":{"v":"good|bad","why":"<8w>"},"ai_news":{...},"teacher":{...},"coach":{...},"overall":{...}}"""
+<calibration_examples>
+triage GOOD: clear who/what/why-now one-liners, no drafts. | triage BAD: includes a ready-to-send reply draft (automatic bad).
+ai_news GOOD: fresh insights absent from the already-covered list. | ai_news BAD: repeats a topic the INPUT DATA marks already-covered.
+teacher GOOD: plain concept anchored to a real code path + quiz. | teacher BAD: vague or an invented code path.
+coach GOOD: a concrete personal fact tied to Daniel. | coach BAD: a generic platitude.
+</calibration_examples>
+Return JSON only, reason BEFORE verdict on each: {"triage":{"reason":"<=8w>","v":"good|bad"},"ai_news":{...},"teacher":{...},"coach":{...},"overall":{...}}"""
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fixture", default=None)
     args = ap.parse_args()
-    fx = sorted(glob.glob(os.path.expanduser("~/twin-corpus/datasets/prefetch-fixtures/*.txt")))
+    fx = sorted(glob.glob(os.path.expanduser("~/twin-corpus/datasets/brief-inputs/*.txt")))
     path = [f for f in fx if args.fixture and args.fixture in f] or fx[-1:]
     fixture = open(path[0]).read()
     skill = open(os.path.join(HERE, "agents/brief/SKILL.md")).read()

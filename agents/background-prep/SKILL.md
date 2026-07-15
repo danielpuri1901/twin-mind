@@ -63,7 +63,7 @@ If the prompt says [LATE], skip depth: WHO + GOAL + one question, send within mi
 ## After sending
 
 Archive the dossier (judge calibration reads this later): append ONE JSON line to
-`~/twin-corpus/datasets/prep-archive.jsonl` with fields `{"date", "meeting", "dossier"}`
+`~/twin-corpus/datasets/dossiers-sent.jsonl` with fields `{"date", "meeting", "dossier"}`
 (use the terminal; write the dossier text verbatim).
 Run the state-update command given in your prompt (marks this prep delivered so the poller stops retrying).
 If you could not deliver, do NOT run it - the poller will retry you.

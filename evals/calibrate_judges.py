@@ -6,17 +6,23 @@ import boto3, json, os, re
 from collections import defaultdict
 
 brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
-SYS = """Judge this morning-brief email section by section, verdict "good" or "bad" each, per these standards:
+SYS = """You are a strict, fair judge of Daniel's morning-brief email. Judge it section by section, verdict "good" or "bad" ("n/a" if the section is absent), per these standards. Reason FIRST from the evidence, THEN give the verdict.
 - triage (1. NEEDS YOU TODAY): judge ONLY what the document shows: clear one-liners, no contradictions, plausible prioritization. Do NOT guess staleness - external facts are checked elsewhere.
-- ai_news: 2-3 insights not headlines; BAD if a topic obviously repeats prior briefs (Sonnet 5 appearing on Jul 5 OR LATER = repeat; Dan Luu fabrication story after Jul 6 = repeat; GPT-5.6 Sol/Terra after Jul 5 = repeat; first mentions are fine).
+- ai_news: 2-3 insights not headlines; BAD if a topic repeats a recent brief. You judge ONE brief in isolation and cannot see prior briefs, so use this known repeat-history: Claude Sonnet 5 led from Jul 5 onward (repeat if it leads again on/after Jul 5); the Dan Luu fabrication story after Jul 6 = repeat; GPT-5.6 Sol/Terra after Jul 5 = repeat. Genuinely first mentions are fine. (Durable fix later: inject the covered-topics list as data instead of hardcoding.)
 - teacher (4. ONE TECHNICAL THING): judge TEACHING QUALITY only - plain words, real depth, real code with a path. (Answer-line presence is checked by code elsewhere - ignore it.) Section absent = "n/a".
 - coach: cites a concrete fact from Daniel's real life, no platitudes. Absent = "n/a".
 - overall: consistent structure, trustworthy, readable fast.
-Return JSON only, each section an object: {"triage":{"v":"good|bad|n/a","why":"<8 words>"}, "ai_news":{...}, "teacher":{...}, "coach":{...}, "overall":{...}}"""
+<calibration_examples>
+triage GOOD: latest-message state applied, watch-don't-nudge correct for the date. | triage BAD: an item is stale - the call it references already happened.
+ai_news GOOD: fresh insights well-tied to why they matter. | ai_news BAD: same lead item as a recent brief (repetition).
+teacher GOOD: concept in plain words anchored to a real file path. | teacher BAD: taught well but built on a stale or ungrounded number.
+coach GOOD: anchored to a real thing Daniel did. | coach BAD: pushes action on a premise that is no longer true.
+</calibration_examples>
+Return JSON only, each section an object with reason BEFORE verdict: {"triage":{"reason":"<=8 words>","v":"good|bad|n/a"}, "ai_news":{...}, "teacher":{...}, "coach":{...}, "overall":{...}}"""
 
-briefs = [json.loads(l) for l in open(os.path.expanduser("~/twin-corpus/datasets/brief-archive.jsonl"))]
+briefs = [json.loads(l) for l in open(os.path.expanduser("~/twin-corpus/datasets/briefs-sent.jsonl"))]
 labels = defaultdict(dict)
-for l in open(os.path.expanduser("~/twin-corpus/datasets/brief-labels.jsonl")):
+for l in open(os.path.expanduser("~/twin-corpus/datasets/brief-verdicts.jsonl")):
     r = json.loads(l)
     labels[r["brief"].split("|")[0].strip()][r["section"]] = r["verdict"]
 
@@ -44,7 +50,7 @@ for idx, b in enumerate(briefs):
             if g == j:
                 agree[sec][0] += 1
             else:
-                why = jv.get("why", "") if isinstance(jv, dict) else ""
+                why = (jv.get("reason", jv.get("why", "")) if isinstance(jv, dict) else "")
                 disagreements.append(f"[{idx}] {b['subject'][:30]} {sec}: Daniel={g} judge={j} ({why})")
 
 print("JUDGE CALIBRATION - Sonnet vs Daniel's endorsed labels")

@@ -23,11 +23,20 @@ def todays_brief():
     return ""
 
 RUBRICS = {
-    "teacher_shadow": """Score section '4. ONE TECHNICAL THING' 0-1 on: plain words without losing depth;
-quotes REAL code with a file path; ends with quiz question AND its answer. Return JSON {"score":0-1,"why":"<15 words"}""",
-    "coach_shadow": """Score section '5. COACH' 0-1 on: cites a concrete fact from Daniel's actual life/data
-(not generic); connects to his stated values (curious, adventurous, determined, best version); zero platitudes.
-Return JSON {"score":0-1,"why":"<15 words"}""",
+    "teacher_shadow": """You are a strict, fair judge of the morning brief's teaching section.
+Score section '4. ONE TECHNICAL THING' 0-1 on: plain words without losing depth; quotes REAL code with a file path; ends with a quiz question AND its answer.
+<calibration_examples>
+GOOD (~0.9): explains RRF ranking mechanics grounded in a real file path, ends with a quiz and its answer.
+BAD (~0.3): teaches scalable-oversight well, but has NO answer line after the quiz and cites a stale item-count. (missing the required answer + an ungrounded number)
+</calibration_examples>
+Reason FIRST from the specific evidence, THEN score. Return JSON only: {"reasoning":"<1-2 sentences citing what you saw>","score":0-1}""",
+    "coach_shadow": """You are a strict, fair judge of the morning brief's coach section.
+Score section '5. COACH' 0-1 on: cites a concrete fact from Daniel's actual life/data (not generic); connects to his stated values (curious, adventurous, determined, best version); zero platitudes.
+<calibration_examples>
+GOOD (~0.9): anchors to a specific thing Daniel actually did and ties it to a concrete next step. (real fact, no platitude)
+BAD (~0.3): well-written but pushes action on a stale premise, e.g. a call that already happened. (built on a fact no longer true)
+</calibration_examples>
+Reason FIRST from the specific evidence, THEN score. Return JSON only: {"reasoning":"<1-2 sentences citing what you saw>","score":0-1}""",
 }
 
 brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
@@ -36,10 +45,11 @@ auth = base64.b64encode(f"{os.environ['HERMES_LANGFUSE_PUBLIC_KEY']}:{os.environ
 for name, rubric in RUBRICS.items():
     r = brt.converse(modelId="eu.anthropic.claude-sonnet-4-6",
         system=[{"text": rubric}], messages=[{"role": "user", "content": [{"text": body[:6000]}]}],
-        inferenceConfig={"maxTokens": 150, "temperature": 0})
+        inferenceConfig={"maxTokens": 300, "temperature": 0})
     txt = r["output"]["message"]["content"][0]["text"]
     try:
         v = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
+        v["why"] = v.get("reasoning", v.get("why", ""))  # reason-first schema; keep downstream key
     except Exception:
         v = {"score": -1, "why": "judge parse error"}
     req = urllib.request.Request("https://cloud.langfuse.com/api/public/scores",
