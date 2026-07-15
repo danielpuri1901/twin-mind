@@ -1,6 +1,24 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-15 (later) - four-platform eval bake-off + judge few-shot + dataset renames + Langfuse mirror
+- JUDGE few-shot + reason-first across all 4 judges; calibration eval caught a bundled regression
+  (ai_news cross-brief memory deletion, 80->66), restored -> ai_news 100%; ship gate held 3/3.
+- DATASETS renamed to plain words (gold/labels/archive/fixtures -> answers/verdicts/sent/inputs);
+  all code refs + box files updated, gate green.
+- LANGFUSE: verified healthy (earlier "broken" was a wrong-key-name probe + stale OTel warning);
+  evals/push_to_langfuse.py mirrors the 5 datasets into Langfuse Datasets; rule added to CLAUDE.md
+  (everything must also reach Langfuse for Daniel's visibility).
+- FOUR-PLATFORM BAKE-OFF (Daniel's ask): evals/compare/ - one shared inbox-decision eval, four thin
+  adapters. All live: Langfuse (datasets), Braintrust (EU, datasets+experiment, Eval() one-call, 100%),
+  Arize (EU eu-west-1a, datasets+experiment via ax CLI - US default 401s EU keys, the gotcha),
+  LangSmith (EU, datasets+experiment via evaluate(), project twin-mind; key recovered from Daniel's
+  on-disk demo .env). Real-data-to-all-4 = deliberate override of EU-residency ground truth (derived
+  data only; raw corpus stays local). Scorecard artifact published. FINDING: Langfuse is the only one
+  of the four NOT on its EU host (cloud.langfuse.com vs eu.cloud.langfuse.com) - flagged.
+- Setup-friction ranking (firsthand): Braintrust smoothest, LangSmith clean, Langfuse env/id quirks,
+  Arize most friction (CLI-only datasets + region 401 + manual experiments). All ingest OTel = no lock-in.
+
 ## 2026-07-14 (later) - granola transcript ingest BUILT, gate-green
 - pipeline/fetch_granola.py BUILT: Mac-side 15-min poller, the post-call mirror of background-prep.
   Path-2 auth chain lifted verbatim from the proven granola_path2_decrypt.py (Keychain -> storage.dek
