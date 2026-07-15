@@ -145,6 +145,15 @@ check("parse failure marks the doc failed (retried next poll)", state["bad1"]["s
 c = fg.process([doc("bad1")], final_fetch, state, inbox, NOW, first_run=False)
 check("failed doc is retried and saved on recovery", c["saved"] == 1 and state["bad1"]["status"] == "saved")
 
+# --- build_markdown date handling: the 2026-07-15 failure. A manual Sam-transcript fetch
+# passed an isoformat STRING for saved_on and build_markdown crashed on '.strftime'. The 33
+# fixtures never caught it because process() only ever passes a datetime. Now hardened + tested. ---
+from datetime import datetime as _dt
+md_dt = fg.build_markdown(doc("x", title="T"), FINAL, _dt(2026, 7, 15))
+check("build_markdown accepts a datetime (production path)", "auto-saved 2026-07-15" in md_dt)
+md_str = fg.build_markdown(doc("x", title="T"), FINAL, "2026-07-15")  # the manual-fetch bug input
+check("build_markdown accepts a string date without crashing", "auto-saved 2026-07-15" in md_str)
+
 for d in [inbox]:
     shutil.rmtree(d, ignore_errors=True)
 

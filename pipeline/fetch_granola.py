@@ -256,11 +256,14 @@ def participants(doc):
 
 def build_markdown(doc, segments, saved_on):
     body = segments_to_body(segments)
+    # saved_on may be a date/datetime OR a string (a manual fetch on 2026-07-15 passed
+    # an isoformat string and hit 'str has no attribute strftime'). Accept both.
+    stamp = saved_on.strftime("%Y-%m-%d") if hasattr(saved_on, "strftime") else str(saved_on)[:10]
     return (
         f"Meeting Title: {doc_title(doc)}\n"
         f"Date: {doc_created_human(doc)}\n"
         f"Participants: {participants(doc)}\n"
-        f"(Exact Granola transcript, auto-saved {saved_on.strftime('%Y-%m-%d')}.)\n"
+        f"(Exact Granola transcript, auto-saved {stamp}.)\n"
         f"\n"
         f"{body}\n"
     )
