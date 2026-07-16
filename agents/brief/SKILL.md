@@ -37,6 +37,13 @@ Sections, in order:
    skip the answer.
 5. COACH (1 item) - one nudge, spaced-repetition style: resurface if unacknowledged, else one new
    observation grounded in concrete corpus evidence. No platitudes.
+   GROUNDING (hard rule, 2026-07-16 after a hallucination): every claim about Daniel's CURRENT
+   situation must be a dated, verifiable fact. The corpus holds PLANS, proposals and experiments
+   that were later changed or cancelled - NEVER present one as if it is happening now (the brief
+   once claimed "day one of the Haiku trial" - there was no trial; it was proposed then cancelled).
+   Do NOT state what the system "is doing today" (which model it runs, what experiment is live)
+   unless that fact is in your prefetched inputs. When you have no verifiable current fact, coach
+   from a stable value or a dated past behavior - cite the date. If unsure it is current, leave it out.
 (There is NO open-loops section - removed 2026-07-14 with the job-search pause.)
 
 After sending: deliver a 3-line summary on Telegram ENDING with exactly:
