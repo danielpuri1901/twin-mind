@@ -3,7 +3,7 @@
 Current items are inbox decisions (does this message need action from Daniel?) (dataset: twin-triage-v1); more failure classes join as they occur.
 
 Anatomy (Anthropic "Demystifying evals for agents", adopted 2026-07-08):
-  task  = one inbox-decision-answers.jsonl item (evidence bundle -> expected judgment)
+  task  = one brief-inbox-decisions.jsonl item (evidence bundle -> expected judgment)
   trial = one model attempt; TRIALS=3 because n=1 conflates variance with change
   graders per task:
     1. code-based   : output must carry an explicit "ACTIONABLE: yes|no" verdict
@@ -22,7 +22,7 @@ import argparse, json, os, re, sys, time
 import boto3
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GOLD = os.path.expanduser("~/twin-corpus/datasets/inbox-decision-answers.jsonl")
+GOLD = os.path.expanduser("~/twin-corpus/datasets/brief-inbox-decisions.jsonl")
 REGION = "eu-west-1"
 MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
 JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate

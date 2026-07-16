@@ -14,7 +14,7 @@ import eval_task as E
 AX = os.path.expanduser("~/.hermes/hermes-agent/venv/bin/ax")
 SPACE = os.environ["ARIZE_SPACE_ID"]
 D = os.path.expanduser("~/twin-corpus/datasets")
-DATASETS = ["inbox-decision-answers", "brief-verdicts", "prep-verdicts", "qa-answers", "briefs-sent"]
+DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts", "corpus-qa", "brief-archive"]
 
 
 def ax(*args, inp=None):
@@ -69,7 +69,7 @@ def run_experiment():
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
         tmp = f.name
     rc, out = ax("experiments", "create", "--name", "inbox-decisions",
-                 "--dataset", "inbox-decision-answers", "--space", SPACE, "--file", tmp)
+                 "--dataset", "brief-inbox-decisions", "--space", SPACE, "--file", tmp)
     print(f"arize experiment: {'ok' if rc == 0 else 'FAIL'} {out[-200:]}")
 
 

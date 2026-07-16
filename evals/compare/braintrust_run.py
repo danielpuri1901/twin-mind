@@ -13,7 +13,7 @@ import braintrust
 
 D = os.path.expanduser("~/twin-corpus/datasets")
 PROJECT = "twin-mind"
-DATASETS = ["inbox-decision-answers", "brief-verdicts", "prep-verdicts", "qa-answers", "briefs-sent"]
+DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts", "corpus-qa", "brief-archive"]
 
 
 def expected_of(r):

@@ -14,7 +14,7 @@ from langsmith import Client, evaluate
 
 c = Client()  # LANGSMITH_API_KEY (+ LANGSMITH_ENDPOINT if the account is EU)
 D = os.path.expanduser("~/twin-corpus/datasets")
-DATASETS = ["inbox-decision-answers", "brief-verdicts", "prep-verdicts", "qa-answers", "briefs-sent"]
+DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts", "corpus-qa", "brief-archive"]
 
 
 def expected_of(r):
@@ -34,7 +34,7 @@ def push_datasets():
             print("skip", name); continue
         ds = get_or_create(name)
         rows = [json.loads(l) for l in open(p)]
-        inputs = [r["input"] if name == "inbox-decision-answers" else r for r in rows]
+        inputs = [r["input"] if name == "brief-inbox-decisions" else r for r in rows]
         outputs = [{"expected": expected_of(r)} for r in rows]
         c.create_examples(inputs=inputs, outputs=outputs, dataset_id=ds.id)
         print(f"langsmith dataset {name}: {len(rows)} items")
@@ -50,7 +50,7 @@ def verdict_match(run, example):
 
 
 def run_experiment():
-    evaluate(target, data="inbox-decision-answers", evaluators=[verdict_match],
+    evaluate(target, data="brief-inbox-decisions", evaluators=[verdict_match],
              experiment_prefix="inbox-decisions", client=c)
 
 

@@ -2,7 +2,7 @@
 """The ONE eval every platform runs, so the four-way comparison is apples-to-apples.
 
 Task: the inbox-decision policy (does Daniel need to act on this message?) - our real
-regression eval. Dataset: inbox-decision-answers. Scorer: deterministic verdict match
+regression eval. Dataset: brief-inbox-decisions. Scorer: deterministic verdict match
 against the gold answer. Platform adapters (langfuse/langsmith/braintrust/arize) wrap
 THIS module; none of the eval logic lives in an adapter.
 """
@@ -17,7 +17,7 @@ DATA = os.path.expanduser("~/twin-corpus/datasets")
 
 def dataset():
     """List of {id, input:{scenario, available_sources}, expected_output, gold_behavior}."""
-    return [json.loads(l) for l in open(os.path.join(DATA, "inbox-decision-answers.jsonl"))]
+    return [json.loads(l) for l in open(os.path.join(DATA, "brief-inbox-decisions.jsonl"))]
 
 
 def run_task(inp):
@@ -44,11 +44,11 @@ import re
 
 
 def brief_sections(limit=None):
-    """Join briefs-sent (text) with brief-verdicts (Daniel's good/bad). One row per
+    """Join brief-archive (text) with brief-section-verdicts (Daniel's good/bad). One row per
     labeled section: {id, section, label, brief_text, subject}."""
-    briefs = [json.loads(l) for l in open(os.path.join(DATA, "briefs-sent.jsonl"))]
+    briefs = [json.loads(l) for l in open(os.path.join(DATA, "brief-archive.jsonl"))]
     rows = []
-    for l in open(os.path.join(DATA, "brief-verdicts.jsonl")):
+    for l in open(os.path.join(DATA, "brief-section-verdicts.jsonl")):
         r = json.loads(l)
         if r.get("verdict") not in ("good", "bad"):
             continue

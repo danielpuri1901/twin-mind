@@ -7,7 +7,7 @@
   --pick N           choose N past qualifying meetings for the dossier bench (mix of repeat
                      contacts and first contacts) and print the exact prompts scan_meetings
                      would have built. Feed these through the real gateway as [BENCH] one-shots;
-                     Daniel's verdicts seed prep-verdicts.jsonl BEFORE the agent goes live.
+                     Daniel's verdicts seed prep-dossier-verdicts.jsonl BEFORE the agent goes live.
 
 Bench dossiers must go through the real harness (skill + corpus + Exa tools) - research is
 the job; a tool-less Bedrock call would be a proxy, and proxies are banned (2026-07-14 rule).

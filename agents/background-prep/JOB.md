@@ -29,7 +29,7 @@ never turns into "delivered" expires and the next poll retries. No prep can be s
 1. **Physics fixtures in the gate from birth**: evals/test_prep_scan.py - recurring, all-day, Z-vs-TZID, cancelled, circle filter, lease expiry, delivered-idempotence. Runs in eval.sh.
 2. **Poller dead-man**: PrepPollerRan metric + CloudWatch alarm (same pattern as WatchdogRan).
 3. **Did-it-look invariants** (weekly, deterministic): every qualifying calendar event has a state entry; every delivered dossier has query-log lines; zero query-log lines contain calendar/corpus text.
-4. **Shadow week**: dossiers delivered with [SHADOW] prefix, Daniel verdicts them (good|bad + notes) exactly like brief verdicts -> feedback.jsonl -> first labeled dataset (`prep-verdicts.jsonl`).
+4. **Shadow week**: dossiers delivered with [SHADOW] prefix, Daniel verdicts them (good|bad + notes) exactly like brief verdicts -> feedback.jsonl -> first labeled dataset (`prep-dossier-verdicts.jsonl`).
 5. **Later** (post-shadow, 15+ labels): calibrated dossier judge (pinned Sonnet) on accuracy/citations/goal-quality; then and only then a model bake-off ON THIS JOB (never a proxy dataset - the rule).
 
 **Model**: Sonnet (eu.anthropic.claude-sonnet-4-6). Any swap requires this agent's own-job benchmark first.

@@ -35,19 +35,19 @@ def load(fn):
 
 # (file, langfuse dataset name, stable-id fn, input fn, expected fn, metadata fn)
 SPECS = [
-    ("inbox-decision-answers.jsonl", "inbox-decision-answers",
+    ("brief-inbox-decisions.jsonl", "brief-inbox-decisions",
      lambda r: r["id"], lambda r: r["input"], lambda r: r["expected_output"],
      lambda r: {"failure_class": r.get("failure_class"), "assertions": r.get("gold_behavior")}),
-    ("brief-verdicts.jsonl", "brief-verdicts",
+    ("brief-section-verdicts.jsonl", "brief-section-verdicts",
      lambda r: f'{r["brief"]}|{r["section"]}', lambda r: {"brief": r["brief"], "section": r["section"]},
      lambda r: r["verdict"], lambda r: {"why": r.get("why"), "labeler": r.get("labeler"), "date": r.get("date")}),
-    ("prep-verdicts.jsonl", "prep-verdicts",
+    ("prep-dossier-verdicts.jsonl", "prep-dossier-verdicts",
      lambda r: f'bench-{r.get("bench")}', lambda r: {"meeting": r.get("meeting")},
      lambda r: r.get("verdict"), lambda r: {"notes": r.get("notes"), "labeler": r.get("labeler"), "date": r.get("date")}),
-    ("qa-answers.jsonl", "qa-answers",
+    ("corpus-qa.jsonl", "corpus-qa",
      lambda r: r["id"], lambda r: r["question"], lambda r: r["answer"],
      lambda r: {"citation": r.get("citation"), "corrected": r.get("corrected")}),
-    ("briefs-sent.jsonl", "briefs-sent",
+    ("brief-archive.jsonl", "brief-archive",
      lambda r: r.get("subject", r.get("date")), lambda r: {"date": r.get("date"), "subject": r.get("subject")},
      lambda r: r.get("body"), lambda r: {}),
 ]

@@ -20,9 +20,9 @@ coach GOOD: anchored to a real thing Daniel did. | coach BAD: pushes action on a
 </calibration_examples>
 Return JSON only, each section an object with reason BEFORE verdict: {"triage":{"reason":"<=8 words>","v":"good|bad|n/a"}, "ai_news":{...}, "teacher":{...}, "coach":{...}, "overall":{...}}"""
 
-briefs = [json.loads(l) for l in open(os.path.expanduser("~/twin-corpus/datasets/briefs-sent.jsonl"))]
+briefs = [json.loads(l) for l in open(os.path.expanduser("~/twin-corpus/datasets/brief-archive.jsonl"))]
 labels = defaultdict(dict)
-for l in open(os.path.expanduser("~/twin-corpus/datasets/brief-verdicts.jsonl")):
+for l in open(os.path.expanduser("~/twin-corpus/datasets/brief-section-verdicts.jsonl")):
     r = json.loads(l)
     labels[r["brief"].split("|")[0].strip()][r["section"]] = r["verdict"]
 
