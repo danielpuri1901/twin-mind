@@ -10,8 +10,11 @@ Emits a structured text block:
 """
 import email, imaplib, json, os, re, subprocess, sys, time, urllib.request
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
+
+LUX = ZoneInfo("Europe/Luxembourg")  # Daniel's TZ - the box is in Ireland; pin the date to Luxembourg
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 for line in open(os.path.expanduser("~/.hermes/.env")):
@@ -133,7 +136,61 @@ def inbox():
             + ("\n".join(lines) or "(no emails)")), len(rows)
 
 
+def technical_item():
+    """Source-inject the quiet-day fallback item so the model never does the fragile
+    'day-of-year mod item-count' arithmetic itself. That arithmetic is what made past teacher
+    sections wrong (stale count: the list is numbered 1-13 but has a hidden '3b' = 14 items).
+    Code counts the list and picks the item deterministically; the model just teaches it."""
+    try:
+        path = os.path.expanduser("~/twin-corpus/wiki/learning/digest-queue.md")
+        items = []
+        for line in open(path):
+            m = re.match(r"\s*(\d+[a-z]?)\.\s+(.+)", line)
+            if m:
+                items.append((m.group(1), m.group(2).strip()))
+        if not items:
+            return "(digest-queue.md unparseable - teach from the CHANGELOG top entry instead)"
+        doy = datetime.now().timetuple().tm_yday
+        idx = doy % len(items)
+        label, text = items[idx]
+        return (f'day-of-year {doy} mod {len(items)} items = index {idx} -> item "{label}": {text}\n'
+                f"(code-picked; do NOT recompute - use this exact item on a quiet day)")
+    except Exception as e:
+        return f"(technical_item failed, non-fatal - teach from the CHANGELOG top entry: {e})"
+
+
+def changelog_top():
+    """The top CHANGELOG entry - the source for the ONE TECHNICAL THING section. Injected so the
+    composer teaches from what we just built/broke WITHOUT reading files itself (deterministic,
+    no tool calls in the compose step)."""
+    try:
+        path = os.path.expanduser("~/super-project/docs/CHANGELOG.md")
+        lines, capturing = [], False
+        for line in open(path, encoding="utf-8"):
+            if line.startswith("## 2"):          # a dated entry header
+                if capturing:
+                    break                          # reached the next entry -> stop
+                capturing = True
+            if capturing:
+                lines.append(line.rstrip())
+                if sum(len(x) for x in lines) > 2800:
+                    break
+        return "\n".join(lines).strip() or "(CHANGELOG empty)"
+    except Exception as e:
+        return f"(changelog unavailable: {e})"
+
+
+def today_block():
+    """Authoritative date, injected so the model never runs `date` (denied under cron_mode:deny)
+    and never guesses it (the 2026-07-24 'Friday 25 July' bug). Europe/Luxembourg = Daniel's TZ."""
+    now = datetime.now(LUX)
+    subj = f"{now.strftime('%A')} {now.day} {now.strftime('%B')}"   # "Friday 24 July" - portable, no leading zero
+    return (f"{now.strftime('%A')}, {now.day} {now.strftime('%B %Y')} (Europe/Luxembourg)\n"
+            f"Subject line MUST be EXACTLY: Morning brief - {subj}")
+
+
 def main():
+    out("TODAY (authoritative - use THIS date; never run `date`, never compute it)", today_block())
     w = weather()
     out("WEATHER (code-fetched, Open-Meteo)", w)
     cal = subprocess.run(["python3", os.path.join(HERE, "calendar_read.py"), "--days", "1"],
@@ -144,6 +201,8 @@ def main():
     except Exception:
         cov = "(none yet)"
     out("AI TOPICS ALREADY COVERED (do NOT repeat any of these)", cov[-1500:])
+    out("QUIET-DAY FALLBACK TECHNICAL ITEM (code-picked; use ONLY if no CHANGELOG-worthy incident)",
+        technical_item())
     ib, n = inbox()
     out(f"INBOX ({n} emails after noise filter, state-annotated)", ib)
     out("YOUR JOB", "Judge substance on the emails above (the state flags are facts - trust them). "

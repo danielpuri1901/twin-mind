@@ -20,8 +20,11 @@ Run with Hermes venv python (has boto3 + langfuse): needs a live AWS session.
 import argparse, json, os, re, sys, time
 
 import boto3
+from pydantic import BaseModel
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, HERE)
+from shared.structured import structured_call
 GOLD = os.path.expanduser("~/twin-corpus/datasets/brief-inbox-decisions.jsonl")
 REGION = "eu-west-1"
 MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
@@ -39,24 +42,42 @@ def _load_production_rules():
     block = "Rules (from the production skill, section 1):\n" + skill[start:end]
     return ("You are Twin Mind, deciding for each email: does Daniel need to act on this or not.\n"
             + block +
-            "\nGiven the evidence, produce:\n"
-            '1. First line exactly: "ACTIONABLE: yes" or "ACTIONABLE: no"\n'
-            "2. Then 2-4 sentences: your judgment of the current state and what (if anything) belongs in the brief.")
+            "\nGiven the evidence, decide via the tool: actionable yes/no, plus 2-4 sentences of "
+            "judgment on the current state and what (if anything) belongs in the brief.")
 
 INBOX_DECISION_RULES = _load_production_rules()
 
 
+# ---------- enforced shapes (structured-output rule 2026-07-24: never scrape an LLM output) ----------
+
+class Decision(BaseModel):
+    """An inbox-triage decision: does Daniel need to act on this?"""
+    actionable: bool   # does this need action/a decision from Daniel today?
+    reasoning: str     # 2-4 sentences: judgment of the current state, what belongs in the brief
+
+
+class AssertionCheck(BaseModel):
+    assertion: str   # the gold assertion, verbatim
+    why: str         # reasoning FIRST - commit to the verdict only after
+    passed: bool     # does the decision satisfy the assertion on substance?
+
+
+class AssertionVerdicts(BaseModel):
+    """Per-assertion verdicts on an inbox decision. No holistic verdict - assertions only
+    (ruling 2026-07-14: specific and auditable beats vibes)."""
+    assertions: list[AssertionCheck]
+
+
 JUDGE_SYS = """You are a strict, fair evaluator. Given an inbox-decision DECISION and a list of GOLD
 ASSERTIONS describing correct behavior, judge whether the decision satisfies each assertion on
-SUBSTANCE, not wording. For each assertion, write your reasoning BEFORE the pass/fail (reason first,
-then commit to the verdict).
+SUBSTANCE, not wording. For each assertion, write your reasoning (why) BEFORE committing to passed
+(reason first, then the verdict).
 <example>
 ASSERTION: "collapse each thread to its LATEST message before judging state"
-DECISION notes the reply already confirmed the plan, so no nudge -> why: judged on the newest message, loop closed; pass: true.
-DECISION reminds about the original ask, ignoring the later reply -> why: judged on a superseded message; pass: false.
+DECISION notes the reply already confirmed the plan, so no nudge -> why: judged on the newest message, loop closed; passed: true.
+DECISION reminds about the original ask, ignoring the later reply -> why: judged on a superseded message; passed: false.
 </example>
-Return JSON only, with why BEFORE pass on each: {"assertions": [{"assertion": "...", "why": "<reasoning>", "pass": true|false}]}
-Do NOT return any holistic verdict - assertions only (ruling 2026-07-14: specific and auditable beats vibes)."""
+Cover every gold assertion, each exactly once."""
 
 
 def claude(system, user, max_tokens=500, temperature=0.4, model=None):
@@ -71,23 +92,41 @@ def claude(system, user, max_tokens=500, temperature=0.4, model=None):
     return text, time.time() - t0, usage.get("outputTokens", 0)
 
 
+def decide(user):
+    """The candidate decision as an ENFORCED shape (was: free text + a regex for the ACTIONABLE
+    line). temperature stays 0.4 - trials exist to expose the candidate's real variance."""
+    t0 = time.time()
+    d = structured_call(MODEL, INBOX_DECISION_RULES, user, Decision,
+                        max_tokens=500, temperature=0.4)
+    return d, time.time() - t0
+
+
+def render_decision(d):
+    """Deterministic text form of a Decision (for the judge + logs)."""
+    return f"ACTIONABLE: {'yes' if d.actionable else 'no'}\n{d.reasoning}"
+
+
 def code_grader(decision, expected_output):
-    m = re.match(r"\s*ACTIONABLE:\s*(yes|no)", decision, re.I)
-    if not m:
-        return False, "missing verdict line"
-    got = m.group(1).lower()
+    # accepts a Decision, or the deterministic render_decision() text (platform adapters pass
+    # text outputs around) - parsing OUR OWN render is code-parsing-code, not LLM scraping.
+    if isinstance(decision, Decision):
+        got = "yes" if decision.actionable else "no"
+    else:
+        m = re.match(r"\s*ACTIONABLE:\s*(yes|no)", str(decision), re.I)
+        if not m:
+            return False, "missing verdict line"
+        got = m.group(1).lower()
+    # gold side stays a regex - that reads the DATASET text, not an LLM output
     gold = "no" if re.search(r"NOT actionable|no nudge|no action", expected_output, re.I) else "yes"
     return got == gold, f"verdict={got} gold={gold}"
 
 
-def model_grader(item, decision):
-    user = (f"DECISION:\n{decision}\n\nEXPECTED OUTPUT:\n{item['expected_output']}\n\n"
+def model_grader(item, decision_text):
+    """The judge as an ENFORCED shape (was: prompt-for-JSON + re.search + a silent
+    empty-assertions default that corrupted the gate). Raises loudly if it cannot validate."""
+    user = (f"DECISION:\n{decision_text}\n\nEXPECTED OUTPUT:\n{item['expected_output']}\n\n"
             f"GOLD ASSERTIONS:\n" + "\n".join(f"- {a}" for a in item["gold_behavior"]))
-    raw, _, _ = claude(JUDGE_SYS, user, max_tokens=400, temperature=0, model=JUDGE_MODEL)
-    try:
-        return json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
-    except Exception:
-        return {"assertions": [], "overall": False, "error": raw[:200]}
+    return structured_call(JUDGE_MODEL, JUDGE_SYS, user, AssertionVerdicts, max_tokens=1500)
 
 
 def main():
@@ -102,17 +141,17 @@ def main():
                 + "\n".join(f"- {s}" for s in item["input"]["available_sources"]))
         passes = 0
         for t in range(args.trials):
-            decision, lat, toks = claude(INBOX_DECISION_RULES, user)
+            decision, lat = decide(user)
             ok_code, code_why = code_grader(decision, item["expected_output"])
-            verdict = model_grader(item, decision)
-            asserts = verdict.get("assertions", [])
-            ok = ok_code and bool(asserts) and all(a.get("pass") for a in asserts)
+            verdict = model_grader(item, render_decision(decision))   # raises on invalid - never silent
+            asserts = verdict.assertions
+            ok = ok_code and bool(asserts) and all(a.passed for a in asserts)
             passes += ok
-            failed = [a["assertion"] for a in verdict.get("assertions", []) if not a["pass"]]
+            failed = [a.assertion for a in asserts if not a.passed]
             print(f"  {item['id']} trial {t+1}: {'PASS' if ok else 'FAIL'} "
-                  f"(code: {code_why}; assertions: {sum(bool(a.get('pass')) for a in asserts)}/{len(asserts)}"
+                  f"(code: {code_why}; assertions: {sum(a.passed for a in asserts)}/{len(asserts)}"
                   f"{'; failed: ' + '; '.join(failed) if failed else ''}) "
-                  f"[{lat:.1f}s, {toks} out-toks]")
+                  f"[{lat:.1f}s]")
         rate = passes / args.trials
         print(f"  {item['id']}: pass rate {passes}/{args.trials}\n")
         if rate < 1.0:

@@ -14,7 +14,8 @@ import eval_task as E
 AX = os.path.expanduser("~/.hermes/hermes-agent/venv/bin/ax")
 SPACE = os.environ["ARIZE_SPACE_ID"]
 D = os.path.expanduser("~/twin-corpus/datasets")
-DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts", "corpus-qa", "brief-archive"]
+DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts",
+            "corpus-qa", "brief-archive"] + list(E.SECTION_DATASETS)  # + 5 per-section slices
 
 
 def ax(*args, inp=None):
@@ -34,24 +35,31 @@ def expected_of(r):
     return r.get("expected_output") or r.get("verdict") or r.get("answer") or (r.get("body", "")[:2000])
 
 
+def _eid(r, i):
+    """Stable example_id across dataset shapes (section slices key on brief|section)."""
+    if r.get("id"): return str(r["id"])
+    if r.get("bench") is not None: return f"bench-{r['bench']}"
+    if r.get("section"): return f'{r.get("brief", "")}|{r["section"]}'
+    if r.get("subject"): return str(r["subject"])
+    return str(i)
+
+
 def flatten(name):
     """Arize wants flat columns; carry a stable example_id."""
     rows = []
-    for i, line in enumerate(open(os.path.join(D, name + ".jsonl"))):
-        r = json.loads(line)
-        eid = str(r.get("id") or r.get("bench") or r.get("subject") or i)
-        rows.append({"example_id": eid, "input": json.dumps(r.get("input", r), ensure_ascii=False),
+    for i, r in enumerate(E.dataset_rows(name) or []):
+        rows.append({"example_id": _eid(r, i), "input": json.dumps(r.get("input", r), ensure_ascii=False),
                      "expected_output": str(expected_of(r))})
     return rows
 
 
 def push_datasets():
     for name in DATASETS:
-        p = os.path.join(D, name + ".jsonl")
-        if not os.path.exists(p):
+        flat = flatten(name)
+        if not flat:
             print("skip", name); continue
         with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
-            for row in flatten(name):
+            for row in flat:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
             tmp = f.name
         rc, out = ax("datasets", "create", "--name", name, "--space", SPACE, "--file", tmp)

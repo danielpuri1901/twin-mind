@@ -13,7 +13,8 @@ import braintrust
 
 D = os.path.expanduser("~/twin-corpus/datasets")
 PROJECT = "twin-mind"
-DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts", "corpus-qa", "brief-archive"]
+DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts",
+            "corpus-qa", "brief-archive"] + list(E.SECTION_DATASETS)  # + 5 per-section slices
 
 
 def expected_of(r):
@@ -22,13 +23,12 @@ def expected_of(r):
 
 def push_datasets():
     for name in DATASETS:
-        p = os.path.join(D, name + ".jsonl")
-        if not os.path.exists(p):
+        rows = E.dataset_rows(name)
+        if not rows:
             print("skip", name); continue
         ds = braintrust.init_dataset(project=PROJECT, name=name)
         n = 0
-        for line in open(p):
-            r = json.loads(line)
+        for r in rows:
             ds.insert(input=r, expected=expected_of(r), metadata={})
             n += 1
         print(f"braintrust dataset {name}: {n} items")

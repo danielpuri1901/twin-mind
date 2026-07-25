@@ -25,25 +25,79 @@ MAXCH = 1500        # truncate long records (emails)
 brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
 
 
-def embed(texts, input_type="search_document"):
-    body = json.dumps({"texts": [t[:MAXCH] for t in texts],
+def embed(texts, input_type="search_document", maxch=MAXCH):
+    body = json.dumps({"texts": [t[:maxch] for t in texts],
                        "input_type": input_type, "truncate": "END"})
     r = brt.invoke_model(modelId=MODEL, body=body)
     return json.loads(r["body"].read())["embeddings"]
 
 
-def main():
+def _connect():
+    db = sqlite3.connect(DB)
+    db.enable_load_extension(True)
+    sqlite_vec.load(db)
+    db.enable_load_extension(False)
+    return db
+
+
+def embed_only(meeting):
+    """Incrementally embed ONE meeting's records into the EXISTING vectors.db - no rebuild.
+    Idempotent upsert: drop any prior rows for this meeting (so a re-run or an updated
+    transcript replaces cleanly), then append with fresh rowids. Cost is a handful of Cohere
+    calls for one meeting, not a full re-embed of the whole corpus."""
+    if not os.path.exists(DB):
+        print(f"vectors.db missing - run a full build first"); return 0
+    src = os.path.join(ROOT, "normalized", "transcripts.jsonl")
+    recs = [r for r in (json.loads(l) for l in open(src, encoding="utf-8"))
+            if r.get("meeting", r.get("chat", "")) == meeting and len((r.get("text") or "").strip()) >= 12]
+    if not recs:
+        print(f"no records for meeting '{meeting}' in {src}"); return 0
+    db = _connect()
+    old = [row[0] for row in db.execute("SELECT rowid FROM vec_meta WHERE chat=?", (meeting,)).fetchall()]
+    for rid in old:  # remove prior rows from BOTH aligned tables (idempotent upsert)
+        db.execute("DELETE FROM vec_meta WHERE rowid=?", (rid,))
+        db.execute("DELETE FROM vec_idx WHERE rowid=?", (rid,))
+    rid = db.execute("SELECT COALESCE(MAX(rowid),0) FROM vec_meta").fetchone()[0]
+    n = 0
+    for i in range(0, len(recs), BATCH):
+        chunk = recs[i:i + BATCH]
+        try:
+            vecs = embed([r["text"] for r in chunk])
+        except Exception as e:
+            print(f"  batch {i}: {e} - retrying once", file=sys.stderr)
+            vecs = embed([r["text"] for r in chunk])
+        for r, v in zip(chunk, vecs):
+            rid += 1; n += 1
+            db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
+                       (rid, r.get("source", ""), meeting, r.get("date", ""),
+                        r.get("who", ""), r.get("sender", ""), r.get("text", "")))
+            db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?, ?)",
+                       (rid, sqlite_vec.serialize_float32(v)))
+    db.commit()
+    print(f"incremental embed '{meeting}': removed {len(old)} old, appended {n} vectors -> {DB}")
+    return n
+
+
+def load_records(paths):
+    """Read normalized jsonl paths into records, skipping empty/trivial (<12-char) text."""
     records = []
-    for path in sorted(glob.glob(os.path.join(ROOT, "normalized", "*.jsonl"))):
+    for path in paths:
         for line in open(path, encoding="utf-8"):
             r = json.loads(line)
-            if len((r.get("text") or "").strip()) >= 12:   # skip empty/trivial
+            if len((r.get("text") or "").strip()) >= 12:
                 records.append(r)
-    print(f"embedding {len(records)} records in batches of {BATCH}...")
+    return records
 
-    if os.path.exists(DB):
-        os.remove(DB)
-    db = sqlite3.connect(DB)
+
+def build(records, out_db=DB, maxch=MAXCH):
+    """Full (re)build: create the two aligned tables in out_db and embed every record. Used by
+    main() for production (normalized/ -> vectors.db) and by the retrieval eval for a scratch
+    index (e.g. normalized-windowed/ -> vectors-windowed.db). Deletes out_db first."""
+    print(f"embedding {len(records)} records in batches of {BATCH} -> {out_db} (maxch={maxch})...")
+    os.makedirs(os.path.dirname(out_db), exist_ok=True)
+    if os.path.exists(out_db):
+        os.remove(out_db)
+    db = sqlite3.connect(out_db)
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
@@ -55,10 +109,10 @@ def main():
     for i in range(0, len(records), BATCH):
         chunk = records[i:i + BATCH]
         try:
-            vecs = embed([r["text"] for r in chunk])
+            vecs = embed([r["text"] for r in chunk], maxch=maxch)
         except Exception as e:
             print(f"  batch {i}: {e} - retrying once", file=sys.stderr)
-            vecs = embed([r["text"] for r in chunk])
+            vecs = embed([r["text"] for r in chunk], maxch=maxch)
         for r, v in zip(chunk, vecs):
             n += 1
             db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
@@ -71,8 +125,26 @@ def main():
             db.commit()
             print(f"  {n}/{len(records)}")
     db.commit()
-    print(f"done: {n} vectors -> {DB} ({os.path.getsize(DB)/1e6:.0f} MB)")
+    print(f"done: {n} vectors -> {out_db} ({os.path.getsize(out_db)/1e6:.0f} MB)")
+    return n
+
+
+def main():
+    paths = sorted(glob.glob(os.path.join(ROOT, "normalized", "*.jsonl")))
+    build(load_records(paths), DB, MAXCH)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", default="", help="incrementally embed ONE meeting (by its stem) into the existing db, no rebuild")
+    ap.add_argument("--inputs", nargs="+", help="explicit jsonl paths to embed (instead of normalized/*.jsonl); pairs with --out")
+    ap.add_argument("--out", default=DB, help="output vectors db path (default: index/vectors.db)")
+    ap.add_argument("--maxch", type=int, default=MAXCH, help="per-record char cap before embedding (default 1500)")
+    a = ap.parse_args()
+    if a.only:
+        embed_only(a.only)
+    elif a.inputs:
+        build(load_records(a.inputs), a.out, a.maxch)
+    else:
+        main()

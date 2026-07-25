@@ -14,7 +14,8 @@ from langsmith import Client, evaluate
 
 c = Client()  # LANGSMITH_API_KEY (+ LANGSMITH_ENDPOINT if the account is EU)
 D = os.path.expanduser("~/twin-corpus/datasets")
-DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts", "corpus-qa", "brief-archive"]
+DATASETS = ["brief-inbox-decisions", "brief-section-verdicts", "prep-dossier-verdicts",
+            "corpus-qa", "brief-archive"] + list(E.SECTION_DATASETS)  # + 5 per-section slices
 
 
 def expected_of(r):
@@ -29,11 +30,10 @@ def get_or_create(name):
 
 def push_datasets():
     for name in DATASETS:
-        p = os.path.join(D, name + ".jsonl")
-        if not os.path.exists(p):
+        rows = E.dataset_rows(name)
+        if not rows:
             print("skip", name); continue
         ds = get_or_create(name)
-        rows = [json.loads(l) for l in open(p)]
         inputs = [r["input"] if name == "brief-inbox-decisions" else r for r in rows]
         outputs = [{"expected": expected_of(r)} for r in rows]
         c.create_examples(inputs=inputs, outputs=outputs, dataset_id=ds.id)

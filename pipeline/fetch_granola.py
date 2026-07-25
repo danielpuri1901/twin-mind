@@ -397,6 +397,18 @@ def heartbeat(now):
         pass
 
 
+def inbox_newer_than_index():
+    """True if any saved transcript is newer than the FTS index. This makes ingest fire for
+    a meeting added OUTSIDE this poller's own save path too (a manual fetch, a restored file) -
+    so the guarantee is 'whenever a transcript is saved it gets ingested', not just on poller saves."""
+    idx = os.path.join(HOME, "twin-corpus", "index", "corpus.db")
+    if not os.path.isdir(INBOX_DIR):
+        return False
+    idx_mtime = os.path.getmtime(idx) if os.path.exists(idx) else 0.0
+    return any(f.endswith(".md") and os.path.getmtime(os.path.join(INBOX_DIR, f)) > idx_mtime
+               for f in os.listdir(INBOX_DIR))
+
+
 def reindex(python_exe):
     """normalize -> build FTS index, under a non-blocking lock so it never overlaps a
     manual corpus refresh. If the lock is held, the just-written files stay in the
@@ -451,7 +463,7 @@ def main():
     c = process(docs, lambda did: fetch_transcript(token, did), state, INBOX_DIR, now, first_run)
     save_state(state)
 
-    if not first_run and (c["saved"] or c["updated"]):
+    if not first_run and (c["saved"] or c["updated"] or inbox_newer_than_index()):
         reindex(sys.executable)
 
     if first_run:

@@ -52,10 +52,29 @@ SPECS = [
      lambda r: r.get("body"), lambda r: {}),
 ]
 
-for fn, name, id_fn, in_fn, exp_fn, meta_fn in SPECS:
+
+# Per-section slices of brief-section-verdicts: one dataset per brief job (2026-07-16
+# decomposition - see evals/calibrate_sections.py). Same source file, filtered by section,
+# so there are no duplicate slice files to drift. A 7th spec element is the row filter.
+def _section_spec(sec):
+    return ("brief-section-verdicts.jsonl", f"brief-{sec}-verdicts",
+            lambda r: f'{r["brief"]}|{r["section"]}',
+            lambda r: {"brief": r["brief"], "section": r["section"]},
+            lambda r: r["verdict"],
+            lambda r: {"why": r.get("why"), "labeler": r.get("labeler"), "date": r.get("date")},
+            (lambda r, s=sec: r.get("section") == s))
+
+
+SPECS += [_section_spec(s) for s in ("triage", "ai_news", "teacher", "coach", "overall")]
+
+for spec in SPECS:
+    fn, name, id_fn, in_fn, exp_fn, meta_fn = spec[:6]
+    filt = spec[6] if len(spec) > 6 else None
     rows = load(fn)
     if not rows:
         print(f"skip {name}: {fn} missing/empty"); continue
+    if filt:
+        rows = [r for r in rows if filt(r)]
     lf.create_dataset(name=name)
     n = 0
     for r in rows:

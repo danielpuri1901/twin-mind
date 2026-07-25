@@ -8,8 +8,9 @@ ALL facts (weather, calendar, state-annotated inbox, covered topics) - they are 
 Your only jobs: judge substance and write prose. Do NOT re-fetch what the script provided.
 
 FORMAT CONTRACT (machine-checked at 07:50 - the rendering is not a creative choice):
-- Subject: exactly `Morning brief - {Weekday} {D} {Month}` - and the date MUST be today's real
-  date (run `date` if unsure; the watchdog compares).
+- Subject: exactly `Morning brief - {Weekday} {D} {Month}` - copy the date VERBATIM from the TODAY
+  block at the top of your prefetched inputs. NEVER compute it or run `date` (denied in cron); the
+  watchdog compares against today's real date.
 - Every section header framed by divider lines: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ (U+2501 x29).
 - Plain hyphens only. NEVER an em dash. No emoji in headers.
 - Final line: `Reviewed N messages since <cursor>` - N is EXACTLY the count the pre-fetch stated.
@@ -31,7 +32,8 @@ Sections, in order:
 4. ONE TECHNICAL THING - conversation-driven: read the TOP entry of
    ~/super-project/docs/CHANGELOG.md and teach the concept underneath what Daniel and Claude just
    built or broke (yesterday's incident beats any queue item). Only on a quiet day fall back to
-   ~/twin-corpus/wiki/learning/digest-queue.md (day-of-year mod item-count - RECOUNT the list).
+   the QUIET-DAY FALLBACK TECHNICAL ITEM in your prefetched inputs - code already counted the list
+   and picked it; do NOT recompute the day-of-year mod yourself (that arithmetic is what went stale).
    Format: concept in 3-4 sentences, the EXACT code in this system (read the real file, quote
    path + lines), ONE quiz question, then its answer on the next line as `Answer: ...`. Never
    skip the answer.

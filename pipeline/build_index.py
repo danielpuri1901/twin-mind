@@ -12,13 +12,17 @@ ROOT = os.environ.get("TWIN_CORPUS", os.path.expanduser("~/twin-corpus"))
 DB = os.path.join(ROOT, "index", "corpus.db")
 
 
-def build():
-    os.makedirs(os.path.dirname(DB), exist_ok=True)
-    db = sqlite3.connect(DB)
+def build(inputs=None, out_db=DB):
+    """(Re)build the FTS5 index. Default: all normalized/*.jsonl -> corpus.db (production). The
+    retrieval eval / promotion passes explicit inputs (windowed+contextual) + a candidate out_db."""
+    if inputs is None:
+        inputs = sorted(glob.glob(os.path.join(ROOT, "normalized", "*.jsonl")))
+    os.makedirs(os.path.dirname(out_db), exist_ok=True)
+    db = sqlite3.connect(out_db)
     db.execute("DROP TABLE IF EXISTS msgs")
     db.execute("CREATE VIRTUAL TABLE msgs USING fts5(source, chat, date, who, sender, text)")
     n = 0
-    for path in sorted(glob.glob(os.path.join(ROOT, "normalized", "*.jsonl"))):
+    for path in inputs:
         for line in open(path, encoding="utf-8"):
             r = json.loads(line)
             db.execute("INSERT INTO msgs VALUES (?,?,?,?,?,?)",
@@ -27,8 +31,13 @@ def build():
                         r.get("text", "")))
             n += 1
     db.commit()
-    print(f"indexed {n} records -> {DB}")
+    print(f"indexed {n} records -> {out_db}")
 
 
 if __name__ == "__main__":
-    build()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--inputs", nargs="+", help="explicit jsonl paths (default: normalized/*.jsonl)")
+    ap.add_argument("--out", default=DB, help="output FTS db path (default: index/corpus.db)")
+    a = ap.parse_args()
+    build(a.inputs, a.out)

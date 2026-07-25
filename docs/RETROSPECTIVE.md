@@ -178,3 +178,41 @@ fetch_granola.py is the post-call mirror of background-prep - same 15-minute cad
 
 The pattern held all day: the gate stayed green through every change (26 prep fixtures + 33 granola fixtures + 9/9 regression), every real failure became a fixture the same hour, and the human stayed the ground truth.
 Two agents, one golden dataset, zero production incidents - because the ruler came first.
+
+## Chapter 10 - The ruler learns to measure itself (Jul 16)
+
+This was the day the evals stopped being scaffolding and became the subject.
+
+It started with one framing that made everything click: every eval row is `input -> output -> expected`, and a score is only ever "how well does output match expected."
+Deterministic vs LLM judge is two ways to compute that match; offline vs online is whether you even have an expected.
+Once that atom was in hand, the rest of the day was applying it and, more often, discovering where it had been misapplied.
+
+The first discovery was humbling in the right way.
+The brief judge reported 76% agreement with Daniel's labels - a healthy number.
+It was a lie of averages: the mean of {triage 83, ai_news 92, teacher 33, coach 91, overall 50}.
+One blended judge was really five different jobs sharing a prompt and a scorecard, and a badly miscalibrated section (teacher, 33%) was hiding inside the average.
+The tell: the meaning of "expected" changed per row depending on a hidden `section` field.
+So the judge was split into five per-job evaluators, one dataset and one number each, mirrored to all four platforms.
+No section got worse; the two gestalt judges even improved once focused.
+The 76% was gone, replaced by five numbers that each mean something.
+
+The second discovery was the more valuable failure.
+The textbook move for heterogeneous sections is an analytic rubric - named binary checks instead of one good/bad.
+It was built, measured, and it lost: 76% down to 70%, the whole drop coming from a naive "overall = bad if any section bad" rollup that did not match how Daniel actually judges a brief (a gestalt, not a logical AND).
+The lesson banked: a rubric is a diagnostic tool, not an accuracy boost, and you measure before you adopt.
+The simpler judge stayed.
+
+Then two threads that both taught the same thing: not every failure is the judge's to fix.
+Chasing teacher's 33% by tuning the rubric whack-a-moled 33 -> 67 -> 0 on three rows, so the tuning stopped.
+Reading Daniel's own labels showed why: the defects were a missing quiz answer and a wrong item number, and n=3 cannot calibrate anything.
+The answer was already half-solved (the skill now requires the answer, the watchdog checks it) and the other half was source injection - code counts the digest-queue (the hidden "3b" made the count 14, not 13, which is exactly what went stale) and hands the model the right item so it never does the fragile mod itself.
+Shipped through a green gate.
+
+And the caching correction: the ground-truth doc claimed prompt caching worked on the Bedrock path; a live probe proved it had silently gone to zero after a Converse migration.
+Same probe proved the one-line fix - a `cachePoint` on the system block reads the cache at a tenth the rate.
+Applied, verified, backed up, documented; it activates on the next gateway restart.
+
+The through-line was Daniel's own interview lesson, lived instead of recited: work IN the platform, not the terminal.
+Every judge this day was built and calibrated where an interviewer would want to see it, and the day's understanding was distilled into a prep sheet for the Aug 6 follow-up - seven concepts, each tied to a thing actually built and the plain sentence to say.
+The evals had spent the whole project measuring the twin.
+Today they turned around and measured themselves, and the honest answer to "how good is my judge" turned out to be the most useful thing the twin has taught its owner yet.
