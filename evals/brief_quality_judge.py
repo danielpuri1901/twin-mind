@@ -7,7 +7,8 @@ Why box-side and not a LangSmith server-side evaluator: the server-side judge wo
 Running it here keeps the brief content and the AWS credentials in our own infra - the box already
 has Bedrock via its instance role - and LangSmith receives only the two numbers + the critique.
 
-Judges the two AMBIGUOUS dimensions code cannot: is the AI section real insight, is the coach grounded.
+Judges the two AMBIGUOUS dimensions code cannot: is the AI section real insight, is the coach faithful
+(every claim grounded in the day's facts - RAGAS faithfulness).
 Binary + critique (the canonical method). This is a v0 rubric, to be aligned to Daniel's labels later.
 """
 import json
@@ -32,7 +33,7 @@ class Grade(BaseModel):
     insight_reason: str     # one sentence: are the AI items genuine insight or headlines/filler
     insight_is_real: bool
     coach_reason: str       # one sentence: is every coach claim supported by the facts + concrete
-    coach_grounded: bool
+    coach_faithfulness: bool
 
 
 SYS = (
@@ -42,8 +43,9 @@ SYS = (
     "- insight_is_real: true only if the AI advancements are genuine insight (a non-obvious mechanism, "
     "tradeoff, or implication a sharp practitioner would not already know from the headline), not "
     "headlines, generic restatement, or vague trend-talk.\n"
-    "- coach_grounded: true only if every factual claim the coach makes about Daniel or his system is "
-    "supported by the FACTS given, and it is a concrete, specific nudge, not a platitude."
+    "- coach_faithfulness: true only if every factual claim the coach makes about Daniel or his system is "
+    "supported by the FACTS given (faithful to the source, no fabrication), and it is a concrete, "
+    "specific nudge, not a platitude."
 )
 
 
@@ -75,10 +77,10 @@ def main():
     g = judge(brief, facts)
     # push ONLY the scores + critiques to LangSmith (reference-free feedback on the live run)
     c.create_feedback(r.id, key="insight_is_real", score=int(g.insight_is_real), comment=g.insight_reason)
-    c.create_feedback(r.id, key="coach_grounded", score=int(g.coach_grounded), comment=g.coach_reason)
+    c.create_feedback(r.id, key="coach_faithfulness", score=int(g.coach_faithfulness), comment=g.coach_reason)
     print(f"judged brief.compose run {r.id}")
     print(f"  insight_is_real={g.insight_is_real} :: {g.insight_reason}")
-    print(f"  coach_grounded={g.coach_grounded} :: {g.coach_reason}")
+    print(f"  coach_faithfulness={g.coach_faithfulness} :: {g.coach_reason}")
 
 
 if __name__ == "__main__":
