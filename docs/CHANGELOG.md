@@ -1,6 +1,24 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-07-27 - the eval flywheel synthesis: the grader ladder, datasets-are-code, UI-vs-CLI (reference diagram: docs/eval-flywheel.html)
+
+### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)
+
+**1. The grader ladder** (frontier convergence, verified against RLVR/RLHF/CJE/Copilot papers)
+Use the strongest signal the thing allows, best to worst: (1) CODE CHECK / RLVR - the answer is checkable or has ground truth, run on 100%; (2) BEHAVIORAL OUTCOME - did Daniel act / did it persist (GitHub Copilot: acceptance + code-persistence beat human ratings); (3) CALIBRATED LLM JUDGE - subjective residue only, binary + critique, trusted only when aligned (precision/recall vs Daniel's labels, never raw agreement); (4) THUMBS - weakest, gameable, sycophantic, never the anchor. The frontier moved AWAY from RLHF/thumbs (formally shown to amplify sycophancy) toward RLVR (verifiable) + calibrated reasoning-judges on binary principles. The unifying rule: the more you make the reward CHECKABLE instead of PREFERRED, the less it can be gamed. Twin's deterministic-by-default was engineering the whole system DOWN this ladder before we had the ladder.
+
+**2. Datasets are code; label in the UI, build and measure in code** (the 0.37 -> 0.94 lesson)
+The LangSmith UI is for humans-in-the-loop only: labeling in annotation queues, exploring traces, tuning a judge in the Evaluator Playground, watching dashboards. Everything mechanical is CODE (SDK): build datasets, run experiments, compute precision/recall, the ship gate, bulk ops. HARD RULE, learned the painful way: never build an eval dataset by scraping mixed runs through the UI - it gave the insight judge missing fields (it graded blind) and a bogus 0.37 alignment; rebuilt in code with ONE fixed schema (`inputs={ai_advancements}` / `outputs={insight_is_real}`) and it read the real 0.94 (precision 1.00, recall 0.92). Flow: label in UI -> rebuild as a clean coded dataset with a fixed schema -> eval + gate in code. Canonical golden set built: `brief-insight-golden` (17 clean examples).
+
+**3. The domain-expert limit + the behavioral anchor**
+Ground-truth-is-Daniel holds only where Daniel IS the expert. Scope `insight_is_real` to "useful / non-obvious TO ME" (he owns that), not "factually a real AI advance" (needs a source-check, not a judge - the insight judge grades feel, not truth; red-team confirmed it catches vague fakes but a detailed-but-false claim would slip). When quality is ambiguous even for experts (the "grey area"), anchor on a downstream BEHAVIORAL outcome - "did I follow up / fold it into a project" - and calibrate the cheap judge against that sparse-but-true signal (measure, never optimize the proxy directly - Goodhart).
+
+## 2026-07-25 (ops) - summary-ingest dead-man fired (first live catch), token single-ownership enforced for real; shadow-judge paused
+- THE ALARM WORKED: `twin-mind-summary-ingest-deadman` emailed Daniel within 12h of the ingester dying (the identical failure class previously rotted silently for 10 days). Root cause: refresh-token rotation AGAIN - copying one token file to the box created TWO consumers (hermes gateway auto-refreshing in memory + the ingester refreshing the file); the gateway consumed the rotating refresh token, the ingester's refresh got `invalid_refresh_token` (400), died before heartbeat. The single-ownership rule was written Thursday morning and violated by Thursday afternoon - by us.
+- FIX (sole ownership, structurally this time): fresh `hermes mcp login granola` (Daniel) -> token installed as `granola-ingest.json` owned ONLY by the ingester; granola MCP REMOVED from the box gateway (`hermes mcp remove granola` + token cleanup + restart) - box chat now answers meeting questions from the ingested corpus (<=4h lag) instead of live MCP; Mac's token copy deleted after transfer (the family exists in exactly one place). Ingester refresh call fixed (urlencoded body + RFC-8707 `resource` param - diagnosed by reading the 400 error body: `invalid_refresh_token`, i.e. dead family, not malformed call; the call shape was fixed anyway). Verified: real run green, 12 meetings listed, heartbeat datapoint landed 21:32.
+- SHADOW-JUDGE cron PAUSED (pause-not-delete): `judge_brief.py` POSTs scores to Langfuse without a traceId -> nightly "langfuse write failed" delivered to Telegram at 22:00. Its function is superseded by the LangSmith Layer-2 online evaluators (per the approved 3-layer design, which deletes the Langfuse mirror); resumable via `hermes cron resume shadow-judge`.
+
 ## 2026-07-25 - Twin's 3-layer eval system on LangSmith: tracing, anti-fabrication injection, online evaluators, annotation queue
 
 ### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)

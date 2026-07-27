@@ -222,3 +222,15 @@ Opt out of extended trace retention on the online evaluators to bound how long p
 - OpenAI Cookbook, "Building resilient prompts using an evaluation flywheel" (open coding, axial coding, TPR/TNR, train/val/test split).
 - LangChain, "How to Calibrate LLM-as-Judge with Human Corrections" and the LangSmith Align Evals docs.
 - Production references for the three-layer shape: Schneider Electric and Rippling LangSmith case studies.
+
+### Behavioral / outcome-based ground truth (verified 2026-07-26)
+
+When a quality judgment is genuinely ambiguous (grey area even for the domain expert - e.g. "is this AI insight good"), the industry move is to stop judging quality directly and anchor on a downstream BEHAVIORAL outcome, then use the cheap LLM judge as a dense proxy calibrated against that sparse-but-true signal.
+- Ziegler et al., "Measuring GitHub Copilot's Impact on Productivity" (CACM 2024): acceptance rate (a behavioral signal) predicts productivity better than developers' own ratings; persistence (did the code survive) is the deeper signal. The canonical example.
+- "The Feedback Loop You Never Closed" (tianpan.co, 2026-04-19): implicit-signal taxonomy. High-confidence positives include "copying the output to a downstream tool" and "a follow-up that builds on it" - i.e. Daniel researching an item / folding it into a project. Explicit ratings get ~2% response and cannot separate a 7 from a 9.
+- "Causal Judge Evaluation" (arxiv 2512.11150): calibrate a cheap judge against a ~5% oracle slice; uncalibrated proxies can invert rankings entirely (the "You're absolutely right!" sycophancy trap). Formalizes the fast-proxy / slow-oracle structure.
+- "LLM Eval vs Product Analytics 2026" (futureagi.com): two layers joined on a shared id - system behavior (rubric) vs user behavior (did they act). Rubric drop leads the retention drop by a measurable window.
+
+Two guardrails: it is a MEASURE not a TARGET (optimizing the behavioral proxy directly degrades quality - Goodhart; Copilot found acceptance-as-reward lowered suggestion quality), and prefer PERSISTENCE ("did the insight end up in real work and stay") over the click (acceptance-alone is a vanity metric).
+
+Direction for the brief: keep `insight_is_real` as the cheap dense proxy; add a one-tap "did I use it" capture as the behavioral oracle; calibrate the judge against the oracle over time; never optimize the oracle directly.

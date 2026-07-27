@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>The Eval Flywheel - production reference</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 28px 32px 60px;
+         background: #0d0f14; color: #e8ebf0; line-height: 1.55; max-width: 1150px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: #8b97a8; margin: 30px 0 12px; }
+  .thesis { color: #b7c0ce; font-size: 15px; margin: 0 0 8px; }
+  .thesis b { color: #6ee7a8; }
+  .card { background: #14171f; border: 1px solid #232936; border-radius: 12px; padding: 18px 22px; margin: 0 0 18px; }
+  .mermaid { display: flex; justify-content: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  ol.ladder { margin: 4px 0; padding-left: 0; list-style: none; counter-reset: r; }
+  ol.ladder li { counter-increment: r; padding: 8px 0 8px 42px; position: relative; border-bottom: 1px solid #1c2230; }
+  ol.ladder li:last-child { border-bottom: 0; }
+  ol.ladder li::before { content: counter(r); position: absolute; left: 0; top: 8px; width: 26px; height: 26px;
+      background: #1f6feb33; border: 1px solid #2f5d9e; border-radius: 50%; text-align: center; line-height: 26px;
+      font-weight: 700; color: #8fb8ff; font-size: 13px; }
+  ol.ladder b { color: #e8ebf0; }
+  ol.ladder .best { color: #6ee7a8; } ol.ladder .worst { color: #e6884f; }
+  .k { color: #9aa4b2; font-size: 13px; }
+  code { background: #222a38; padding: 1px 6px; border-radius: 5px; font-size: 12.5px; color: #cfe0ff; }
+  .rule { background: #12211a; border: 1px solid #1f3b2c; border-radius: 12px; padding: 14px 20px; margin: 18px 0; }
+  .rule b { color: #6ee7a8; }
+  .legend { display: flex; gap: 22px; font-size: 13px; color: #9aa4b2; margin: 6px 0 0; flex-wrap: wrap; }
+  .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+  .ground li { margin: 5px 0; color: #b7c0ce; font-size: 13.5px; }
+  .ground b { color: #e8ebf0; }
+</style>
+</head>
+<body>
+  <h1>The Eval Flywheel</h1>
+  <p class="thesis">How production teams build an agent you can trust: <b>engineer as much as possible into checkable code, keep a calibrated judge only for the subjective residue, and let real usage feed a golden set that never stops growing.</b></p>
+  <p class="legend">
+    <span><span class="chip" style="background:#1f6feb"></span>UI (human-in-the-loop)</span>
+    <span><span class="chip" style="background:#2ea043"></span>CODE (SDK / CI)</span>
+    <span><span class="chip" style="background:#8957e5"></span>calibration</span>
+  </p>
+
+  <div class="card">
+    <pre class="mermaid">
+flowchart LR
+  A["1 · BUILD agent<br/>facts in code → one constrained LLM call<br/>(forced tool-use = structured output) → render in code"]:::code
+  B["2 · TRACE<br/>every run to LangSmith"]:::code
+  C["3 · SCORE (auto)<br/>code checks on 100%<br/>· LLM judge on a sample"]:::code
+  D["4 · CATCH<br/>low score OR your 'bad' verdict"]:::code
+  E["5 · LABEL<br/>your ground-truth call"]:::ui
+  F["6 · GOLDEN SET<br/>rebuilt in code · ONE fixed schema · versioned"]:::code
+  G["7 · GATE (CI)<br/>run golden set · block regressions"]:::code
+  H["8 · SHIP the fix"]:::code
+  RT["RED-TEAM<br/>hand-crafted adversarial negatives"]:::code
+  J["CALIBRATE judge<br/>precision + recall vs your labels"]:::cal
+
+  A --> B --> C --> D --> E --> F --> G --> H --> A
+  RT --> F
+  E -. "disagreements = few-shot" .-> J
+  J -. "tunes" .-> C
+
+  classDef code fill:#0f2417,stroke:#2ea043,color:#d6f5e2;
+  classDef ui fill:#0f1f3d,stroke:#1f6feb,color:#cfe0ff;
+  classDef cal fill:#1c1330,stroke:#8957e5,color:#e0d4ff;
+    </pre>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2 style="margin-top:0">Pick a grader per failure mode</h2>
+      <p class="k">Not per section - per <i>failure mode</i>. Use the strongest one the thing allows.</p>
+      <ol class="ladder">
+        <li><b class="best">Code check</b> (verifiable / RLVR) - the answer is checkable or has ground truth. Runs on 100%. <span class="k">e.g. schema, date, quote-is-real, triage vs gold label</span></li>
+        <li><b>Behavioral outcome</b> - did they act / did it persist. Objective, sparse, delayed. <span class="k">e.g. "did I actually use this insight" (GitHub Copilot: acceptance + retention)</span></li>
+        <li><b>Calibrated LLM judge</b> - subjective residue only. Binary + written critique. Trust only when aligned to your labels. <span class="k">e.g. insight quality, coach grounding (= RAGAS faithfulness)</span></li>
+        <li><b class="worst">Thumbs up/down</b> - weakest, biased, gameable, sycophantic. A side channel, never the anchor.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Three layers (all hang off tracing)</h2>
+      <ol class="ladder">
+        <li><b>Offline gate</b> - CI on every change: run the golden set, block regressions like a failing unit test.</li>
+        <li><b>Online monitoring</b> - score a sample of live traffic, alert on drift.</li>
+        <li><b>Flywheel</b> - a bad live run becomes a labeled golden case + a judge correction. Every fixed failure is a permanent test AND a sharper judge.</li>
+      </ol>
+      <p class="k">Schneider Electric &amp; Rippling run this exact 3-layer shape in production on LangSmith.</p>
+    </div>
+  </div>
+
+  <div class="rule">
+    <b>The one hard rule (learned the painful way):</b> never build an eval dataset by scraping mixed runs through the UI - <b>construct it in code with one fixed schema.</b> UI-scraped mixed runs gave the judge missing fields → it graded blind → bogus 0.37 alignment. Rebuilt in code with a fixed <code>{ai_advancements} → {insight_is_real}</code> schema → real 0.94. <b>Datasets are code.</b> Label in the UI; build, measure, and gate in code.
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Grounded in what frontier / prod systems do</h2>
+    <ul class="ground">
+      <li><b>Push everything checkable to code</b> - "Decompose First, Judge Last": a judge tells you it <i>feels</i> worse; a code check is a stack trace. Anthropic: deterministic graders where possible, LLM where necessary.</li>
+      <li><b>Verifiable rewards beat preference</b> - frontier RL moved from RLHF (human thumbs → sycophancy) toward RLVR (checkable outcomes). Make the reward checkable and it can't be gamed.</li>
+      <li><b>Binary + critique, calibrate to a human</b> - Hamel / OpenAI / LangChain converge: never 1-5 scales, one judge per failure mode, target &gt;90% agreement measured as precision/recall (not raw agreement), calibrate against your labels.</li>
+      <li><b>Behavior &gt; stated preference</b> - Copilot: acceptance + code persistence predicts value better than ratings. CJE: calibrate a cheap judge against a small oracle slice or it can invert your rankings.</li>
+      <li><b>Bootstrap, then let usage teach you</b> - you can't predict every failure mode; ship cheap checks + obvious judges + dogfooding, and the flywheel folds in the rest. You are user-zero.</li>
+    </ul>
+  </div>
+</body>
+</html>
