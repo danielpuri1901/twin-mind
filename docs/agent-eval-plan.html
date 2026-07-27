@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Twin Mind - Agent Eval (AWS-aligned)</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0 auto; max-width: 1200px;
+         padding: 28px 32px 70px; background: #0d0f14; color: #e8ebf0; line-height: 1.55; }
+  h1 { font-size: 25px; margin: 0 0 4px; }
+  h2 { font-size: 14px; letter-spacing: .05em; text-transform: uppercase; color: #8b97a8; margin: 34px 0 12px; }
+  .thesis { color: #b7c0ce; font-size: 15px; margin: 0 0 6px; }
+  .thesis b { color: #6ee7a8; }
+  .card { background: #14171f; border: 1px solid #232936; border-radius: 12px; padding: 16px 20px; margin: 0 0 16px; }
+  .mermaid { display: flex; justify-content: center; }
+  .legend { display: flex; gap: 20px; font-size: 13px; color: #9aa4b2; margin: 8px 0 0; flex-wrap: wrap; }
+  .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 4px 0; }
+  th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid #1c2230; vertical-align: top; }
+  th { color: #8fb8ff; font-weight: 600; font-size: 11.5px; letter-spacing: .03em; text-transform: uppercase; }
+  code { background: #222a38; padding: 1px 5px; border-radius: 5px; font-size: 12px; color: #cfe0ff; }
+  pre.code { background: #10141c; border: 1px solid #232936; border-radius: 8px; padding: 12px 14px; overflow-x: auto;
+             font-size: 12px; color: #cfe0ff; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .small { font-size: 12.5px; color: #9aa4b2; }
+  .green { color: #6ee7a8; } .blue { color: #8fb8ff; } .purple { color: #c4a7f5; } .red { color: #e6884f; } .amber { color: #f0c674; }
+  .rule { background: #12211a; border: 1px solid #1f3b2c; border-radius: 12px; padding: 12px 18px; margin: 16px 0; font-size: 14px; }
+  .rule b { color: #6ee7a8; }
+  ol.phases { counter-reset: p; list-style: none; padding-left: 0; margin: 4px 0; }
+  ol.phases li { counter-increment: p; padding: 8px 0 8px 40px; position: relative; border-bottom: 1px solid #1c2230; font-size: 13.5px; }
+  ol.phases li:last-child { border-bottom: 0; }
+  ol.phases li::before { content: "P" counter(p); position: absolute; left: 0; top: 8px; width: 30px; height: 24px;
+     background: #1f6feb33; border: 1px solid #2f5d9e; border-radius: 6px; text-align: center; line-height: 24px;
+     font-weight: 700; color: #8fb8ff; font-size: 12px; }
+  ol.phases b { color: #e8ebf0; }
+  .same { color: #6ee7a8; } .adapt { color: #f0c674; } .drop { color: #e6884f; } .new { color: #8fb8ff; }
+  .lvl { font-size: 11px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; background:#151f2e; color:#8fb8ff; border:1px solid #2f5d9e; }
+  .tcode { color:#8fe0aa; } .tjudge { color:#f0c674; }
+</style>
+</head>
+<body>
+  <h1>Twin Mind - Agent Eval, AWS-aligned</h1>
+  <p class="thesis">The Twin Mind version of the AWS Strands eval blueprint. Same practice, same 10 evaluators, adapted to what the Twin is: a personal <b>capture, recall, and reflection</b> agent on Telegram, grounded in your corpus. <b>Adopt the practice, not the library</b> (Strands ≠ Hermes) · binary scoring, not scales · <b>offline over your history</b>, because usage is sporadic. Full write-up: <code>docs/evaluating-twin-mind-agent.md</code>.</p>
+
+  <h2>1 · The backend flow</h2>
+  <div class="card">
+    <pre class="mermaid">
+flowchart TB
+  CHAT["Twin chat agent · Telegram<br/>capture · recall · reflect"]:::prod
+  CHAT --> PLUGIN["langsmith-trace plugin (v2)<br/>turn + trajectory + tokens"]:::code
+  PLUGIN --> LS["LangSmith · twin-mind (+ Langfuse mirror)<br/>traces, threaded"]:::code
+  LS --> DB["state.db · your 40 sessions / 114 turns<br/>= the offline dataset source"]:::code
+
+  DB --> TASK["offline Task Function<br/>load trace → {input, response, trajectory, context}"]:::code
+  TASK --> EVAL["the 10 evaluators<br/>faithfulness · capture · recall · goal ..."]:::judge
+  EVAL --> GATE["OFFLINE CI GATE · align.py<br/>per-dimension floors · pass^k"]:::code
+  GATE -->|blocks a bad change| SHIP["ship prompt / skill / tool change"]:::code
+  SHIP --> CHAT
+
+  LS --> MON["ONLINE monitors · every turn (~free)<br/>compression_ok · safe_output · thumbs"]:::code
+  MON --> QUEUE["annotation queue · you label in UI"]:::ui
+  QUEUE --> DB
+
+  classDef prod fill:#1c1330,stroke:#8957e5,color:#e0d4ff;
+  classDef code fill:#0f2417,stroke:#2ea043,color:#d6f5e2;
+  classDef ui fill:#0f1f3d,stroke:#1f6feb,color:#cfe0ff;
+  classDef judge fill:#2a1e12,stroke:#b5762f,color:#f5dcc0;
+    </pre>
+    <p class="legend">
+      <span><span class="chip" style="background:#8957e5"></span>the agent</span>
+      <span><span class="chip" style="background:#2ea043"></span>code / SDK / gate</span>
+      <span><span class="chip" style="background:#1f6feb"></span>UI (you label)</span>
+      <span><span class="chip" style="background:#b5762f"></span>LLM-judge</span>
+    </p>
+  </div>
+
+  <div class="rule">
+    <b>The core concepts, mapped:</b> AWS's <b>Case</b> = one golden-set row <code>{input, expected_output, expected_trajectory, metadata}</code> · <b>Experiment</b> = <code>align.py</code> + <code>client.evaluate</code> · <b>Evaluator</b> = <code>judges.py</code> + <code>brief_checks.py</code> · <b>Task Function</b> = our <code>target</code>, run <b>offline over state.db</b> so sporadic volume never becomes noise.
+  </div>
+
+  <h2>2 · The diff — AWS Strands vs Twin Mind</h2>
+  <div class="card">
+    <table>
+      <tr><th>Concept</th><th>AWS Strands</th><th>Twin Mind</th><th>Verdict</th></tr>
+      <tr><td>Framework</td><td>Strands SDK + strands-agents-evals + AgentCore</td><td>Hermes + align.py/judges.py + LangSmith</td><td class="adapt">practice, not library</td></tr>
+      <tr><td>Case / Experiment / Evaluator</td><td>built-in primitives</td><td>golden row / align.py / judges.py</td><td class="same">same</td></tr>
+      <tr><td>Task Function</td><td>online or offline</td><td>offline over state.db (primary)</td><td class="adapt">offline-first</td></tr>
+      <tr><td>Scoring</td><td>scales (7-pt, 5-pt)</td><td>binary + critique</td><td class="adapt">changed - binary aligns</td></tr>
+      <tr><td>Production monitoring</td><td>AgentCore Evaluations, sampled</td><td>deterministic 100% + thumbs</td><td class="adapt">no live sampling at low volume</td></tr>
+      <tr><td>Multi-turn</td><td>ActorSimulator</td><td>deferred</td><td class="drop">dropped for now</td></tr>
+      <tr><td>Metric</td><td>pass^k</td><td>pass^k, n≥3</td><td class="same">same</td></tr>
+      <tr><td>Gate</td><td>3-layer &gt;95/85/90</td><td>3-layer, per-dimension floors</td><td class="same">same shape</td></tr>
+    </table>
+    <p class="small">The practice transfers almost unchanged. What changes: the substrate (Hermes/LangSmith not Strands/AgentCore), the scoring (binary not scales), and offline-first (because your usage is sporadic).</p>
+  </div>
+
+  <h2>3 · The ten evaluators (mapped 1:1 to AWS's ten)</h2>
+  <div class="card">
+    <table>
+      <tr><th>#</th><th>Twin evaluator</th><th>Type</th><th>What it checks</th><th>Level</th><th>AWS parallel</th></tr>
+      <tr><td>1</td><td class="tjudge">faithfulness</td><td>judge</td><td>every claim grounded in your corpus; never invents a personal fact</td><td><span class="lvl">trace</span></td><td>FaithfulnessEvaluator</td></tr>
+      <tr><td>2</td><td class="tcode">capture_saved</td><td>code</td><td>the note/idea was actually written to journal / Notion / memory</td><td><span class="lvl">tool</span></td><td>ToolSelectionAccuracy</td></tr>
+      <tr><td>3</td><td class="tjudge">capture_completeness</td><td>judge</td><td>the whole fragmented dump was captured, nothing dropped</td><td><span class="lvl">session</span></td><td class="new">new (Twin)</td></tr>
+      <tr><td>4</td><td class="tjudge">capture_fidelity</td><td>judge</td><td>recorded what you said, correctly attributed (the Karpathy case)</td><td><span class="lvl">trace</span></td><td>OutputEvaluator</td></tr>
+      <tr><td>5</td><td class="tcode">recall_grounded</td><td>code + judge</td><td>"when did I..." cites a real corpus entry, doesn't hallucinate</td><td><span class="lvl">trace</span></td><td>FaithfulnessEvaluator</td></tr>
+      <tr><td>6</td><td class="tcode">corpus_search_used</td><td>code</td><td>ran <code>corpus-search</code> (via terminal) when the question needed it</td><td><span class="lvl">tool</span></td><td>ToolSelectionAccuracy</td></tr>
+      <tr><td>7</td><td class="tcode">query_quality</td><td>code + judge</td><td>the corpus-search query / save args were right</td><td><span class="lvl">tool</span></td><td>ToolParameterAccuracy</td></tr>
+      <tr><td>8</td><td class="tjudge">helpfulness</td><td>judge</td><td>addressed what you wanted, right register (note vs monologue)</td><td><span class="lvl">trace</span></td><td>HelpfulnessEvaluator</td></tr>
+      <tr><td>9</td><td class="tcode">temporal_correct</td><td>code</td><td>the date / time it used was correct</td><td><span class="lvl">trace</span></td><td class="new">new (Twin)</td></tr>
+      <tr><td>10</td><td class="tjudge">goal_success</td><td>judge</td><td>the whole conversation achieved your intent</td><td><span class="lvl">session</span></td><td>GoalSuccessRateEvaluator</td></tr>
+    </table>
+    <p class="small">Plus two <b>production monitors</b> outside the ten, on 100% of turns (free, no labels): <b class="green">compression_ok</b> (the 16/40 context-compression failure) and <b class="green">safe_output</b> (no PII/secret leak) → AWS HarmfulnessEvaluator + reliability. Dropped from AWS: <b>InteractionsEvaluator</b> (no multi-agent in chat). Scoring is <b>binary + critique</b>, not AWS's scales, so it aligns to your labels.</p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2 style="margin-top:0">4 · The offline Task Function (the fit for sporadic use)</h2>
+      <pre class="code">def twin_task(case):
+    trace = load_trace_from_state_db(case.session_id)
+    return {
+      "input": case.input,
+      "final_response": assistant_reply(trace),
+      "trajectory": tool_calls(trace),      # corpus-search, notion...
+      "retrieved_context": corpus_hits(trace),  # source for faithfulness
+    }</pre>
+      <p class="small">Evaluate your <b>recorded history</b>, not a live sample. Same evaluators + same gate whether the case came from state.db or a live CI run - only the Task Function changes. This is the AWS <code>offline_task</code> pattern, and it's why low volume stops being a problem.</p>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">5 · Dataset = 4 buckets per intent</h2>
+      <table>
+        <tr><th>Bucket</th><th>Share</th><th>Proves</th></tr>
+        <tr><td>Stratified production sample</td><td>60%</td><td>handles real traffic</td></tr>
+        <tr><td class="red">Adversarial (injection)</td><td>15%</td><td>holds under attack</td></tr>
+        <tr><td>Edge cases (you write)</td><td>15%</td><td>the long tail</td></tr>
+        <tr><td>Failure replays</td><td>10%</td><td>paid-for bugs stay fixed</td></tr>
+      </table>
+      <p class="small">Intents: <b>capture · recall · reflect</b>. Row = <code>{input, expected_output, expected_trajectory, metadata}</code>. Start ~30-50/intent from your 114 turns; grow weekly.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">6 · Metrics + the gate</h2>
+    <p style="font-size:13.5px;margin:2px 0"><b class="green">pass^k</b> (all k trials succeed, n≥3) · trajectory match <b>subset/superset</b>, never strict · <b>gate per-dimension vs baseline, never on an aggregate</b> - a strong <code>helpfulness</code> can't hide a weak <code>faithfulness</code>. A prompt / skill / tool-schema edit trips the gate (no code-vs-config line for agents). Three layers, all must pass: tool-use (code) &gt; 95% · reasoning/faithfulness (judge) &gt; 85% · output quality (judge) &gt; 90%.</p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2 style="margin-top:0">7 · The build</h2>
+      <ol class="phases">
+        <li><b>Clean + plugin v2.</b> Remove the sprawl (§8); add trajectory + tokens + turn-success.</li>
+        <li><b>Cases from your history.</b> Mine 114 turns → Case rows by intent (capture/recall/reflect); label ~30-50 in the UI.</li>
+        <li><b>Wire it.</b> Offline Task Function over state.db + the 10 evaluators into <code>align.py</code>; run the first gate.</li>
+        <li><b>Monitors + thumbs.</b> <code>compression_ok</code> + <code>safe_output</code> on 100%; wire the 👎 signal.</li>
+        <li><b>Grow.</b> Golden set grows from thumbs + flagged; add the sampled judge only once volume rises.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">8 · Cleanup - do it clean</h2>
+      <p style="font-size:12.5px;margin:2px 0"><b class="green">KEEP + extend:</b> <code>align.py</code>, <code>judges.py</code>, <code>brief_checks.py</code>, <code>structured.py</code>, <code>eval.sh</code>. <b>KEEP:</b> <code>push_to_langfuse.py</code> + langfuse plugin (mirror stays).</p>
+      <p style="font-size:12.5px;margin:6px 0"><b class="red">DELETE (8):</b> <code>judge_brief.py</code>, <code>calibrate_judges.py</code>, <code>regression_grader_ab_langsmith.py</code>, <code>retrieval_braintrust.py</code>, all <code>compare/</code> adapters (bake-off concluded ≠ the mirror).</p>
+      <p style="font-size:12.5px;margin:6px 0"><b class="blue">MERGE then delete (4):</b> <code>calibrate_sections.py</code>, <code>compare/eval_task.py</code> <span class="small">(rubrics → judges.py FIRST)</span>, <code>brief_ab_langsmith.py</code>, de-dupe <code>brief_quality_judge.py</code>.</p>
+    </div>
+  </div>
+
+  <p class="small" style="margin-top:24px">Grounded in your data (40 sessions, 114 turns, 16/40 compression failures, corpus via corpus-search), the codebase inventory, and frontier practice (AWS Strands blueprint + practical guide · Anthropic Demystifying Evals · LangSmith agentevals · tau/tau2-bench · AgentRedBench). Companion doc: <code>docs/evaluating-twin-mind-agent.md</code>.</p>
+</body>
+</html>
