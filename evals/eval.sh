@@ -19,4 +19,13 @@ if [ "$1" = "--full" ]; then
   echo "== brief composition benchmark (the REAL job; latest fixture) =="
   "$PY" evals/run_brief_bench.py
 fi
+if [ "$1" = "--judges" ] || [ "$1" = "--full" ]; then
+  # Judge-regression gate: run each calibrated judge over its golden set and block if it drops
+  # below its floor. LIVE - makes Bedrock + LangSmith calls (~2 cents), so it is gated behind a
+  # flag, not on the free/deterministic default path. Run it on any judge or prompt change.
+  echo "== judge-alignment gate: insight (live: Bedrock + LangSmith) =="
+  "$PY" evals/align.py insight --gate
+  # coach joins once coach-faithfulness-golden is labeled:
+  # "$PY" evals/align.py coach --gate
+fi
 echo "EVAL GATE: GREEN"

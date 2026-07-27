@@ -35,18 +35,24 @@ def _t_coach(inp):
     return {"prediction": int(g.coach_faithfulness), "reason": g.reason}
 
 
+# floor_* are the CI gate thresholds: a judge change that drops below these fails the ship gate,
+# exactly like a failing unit test. Set from the measured baseline with headroom (insight: 0.94/1.00).
 SPECS = {
     "insight": {
         "dataset": "brief-insight-golden",
         "label": "insight_is_real",
         "target": _t_insight,
         "show": lambda inp: " | ".join(str(x) for x in (inp.get("ai_advancements") or []))[:200],
+        "floor_agreement": 0.85,
+        "floor_precision": 0.90,
     },
     "coach": {
         "dataset": "coach-faithfulness-golden",
         "label": "coach_faithfulness",
         "target": _t_coach,
         "show": lambda inp: str(inp.get("coach_output"))[:200],
+        "floor_agreement": 0.80,
+        "floor_precision": 0.85,
     },
 }
 
@@ -109,6 +115,32 @@ def run(name):
         print(f"    input : {shown}")
         print(f"    judge : {reason}")
 
+    return {"agreement": agree, "precision": prec, "recall": rec,
+            "tp": tp, "fp": fp, "tn": tn, "fn": fn, "n": total}
+
+
+def gate(name):
+    """CI gate: run alignment, exit non-zero if the judge falls below its floor (a judge
+    regression blocks the ship, like a failing test)."""
+    import math
+    spec = SPECS[name]
+    fa, fp = spec["floor_agreement"], spec["floor_precision"]
+    m = run(name)
+    agree_ok = m["agreement"] >= fa
+    prec_ok = (not math.isnan(m["precision"])) and m["precision"] >= fp
+    if agree_ok and prec_ok:
+        print(f"\nJUDGE GATE [{name}]: PASS  "
+              f"(agreement {m['agreement']:.2f} >= {fa}, precision {m['precision']:.2f} >= {fp})")
+        return 0
+    print(f"\nJUDGE GATE [{name}]: FAIL  "
+          f"(agreement {m['agreement']:.2f} vs floor {fa}, precision {m['precision']:.2f} vs floor {fp})")
+    return 1
+
 
 if __name__ == "__main__":
-    run(sys.argv[1] if len(sys.argv) > 1 else "insight")
+    argv = sys.argv[1:]
+    is_gate = "--gate" in argv
+    names = [a for a in argv if not a.startswith("--")] or ["insight"]
+    if is_gate:
+        sys.exit(gate(names[0]))
+    run(names[0])
