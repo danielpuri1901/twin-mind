@@ -54,8 +54,8 @@ SPECS = [
 
 
 # Per-section slices of brief-section-verdicts: one dataset per brief job (2026-07-16
-# decomposition - see evals/calibrate_sections.py). Same source file, filtered by section,
-# so there are no duplicate slice files to drift. A 7th spec element is the row filter.
+# decomposition). Same source file, filtered by section, so there are no duplicate slice
+# files to drift. A 7th spec element is the row filter.
 def _section_spec(sec):
     return ("brief-section-verdicts.jsonl", f"brief-{sec}-verdicts",
             lambda r: f'{r["brief"]}|{r["section"]}',
