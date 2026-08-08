@@ -180,6 +180,30 @@ def changelog_top():
         return f"(changelog unavailable: {e})"
 
 
+def ai_news():
+    """Recent AI news, fetched by CODE so AI ADVANCEMENTS is grounded in real sources instead of
+    the model inventing lab measurements. Tavily news search (official SDK, ~1 credit/call);
+    returns '' on any failure so the brief never breaks - a quiet news block just shortens that
+    section. The composer is told to cite ONLY from these items."""
+    key = os.environ.get("TAVILY_API_KEY")
+    if not key:
+        return ""
+    try:
+        from tavily import TavilyClient
+        hits = TavilyClient(api_key=key).search(
+            "major AI model releases, research results, and developer tool launches announced this week by AI labs and companies",
+            topic="news", time_range="week", max_results=10,
+            exclude_domains=["instagram.com", "facebook.com", "tiktok.com", "medium.com",
+                             "youtube.com", "reddit.com", "linkedin.com",
+                             "prnewswire.com", "businesswire.com"])["results"]
+        return "\n".join(
+            f"- {h['title'].strip()} ({(h.get('published_date') or '')[:10]}) - "
+            f"{' '.join((h.get('content') or '').split())[:220]} [{h.get('url', '')}]"
+            for h in hits)
+    except Exception:
+        return ""
+
+
 def today_block():
     """Authoritative date, injected so the model never runs `date` (denied under cron_mode:deny)
     and never guesses it (the 2026-07-24 'Friday 25 July' bug). Europe/Luxembourg = Daniel's TZ."""

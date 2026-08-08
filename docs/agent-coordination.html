@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Twin Mind - how the agents coordinate</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, "SF Pro Text", Helvetica, Arial, sans-serif;
+         margin: 0; padding: 40px 24px 80px; background: #fafaf8; color: #1a1a1a;
+         display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  p.sub { color: #666; margin: 0 0 28px; font-size: 15px; }
+  .card { background: #fff; border: 1px solid #e4e2dc; border-radius: 10px;
+          padding: 28px 32px; max-width: 1000px; width: 100%; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+  .mermaid { display: flex; justify-content: center; }
+  .legend { max-width: 1000px; margin-top: 22px; font-size: 15px; line-height: 1.65; }
+  .legend b { color: #0b57d0; }
+  .rule { background: #fff8e6; border: 1px solid #f0dfa8; border-radius: 8px;
+          padding: 12px 16px; margin-top: 14px; font-size: 15px; }
+</style>
+</head>
+<body>
+<h1>How Twin's agents coordinate</h1>
+<p class="sub">One rule: agents never talk to each other - everyone reads and writes one shared board (files).</p>
+
+<div class="card">
+<pre class="mermaid">
+flowchart TB
+    TG["📱 Telegram / email  ←→  HERMES-THE-PLUMBING<br/>gateway · state.db (message history) · delivery<br/><i>pipes, not intelligence - every agent uses them</i>"]
+
+    subgraph AGENTS["THE AGENTS - peers, each on its own clock, none aware of the others"]
+        direction LR
+        CHAT["💬 chat twin<br/>(the ONE Hermes AGENT)<br/>ambiguous stuff: Q&A,<br/>coach, journaling, weather"]
+        ING["📥 summary-ingest<br/>script · every 4h"]
+        BRIEF["📋 brief<br/>pipeline + 1 LLM call · 07:30"]
+        PREP["🗂 background-prep<br/>script · every 15 min"]
+        RECAP["🗓 weekly-recap<br/>scripts + 1 LLM call · Friday"]
+        US["🛠 CC sessions<br/>(you + me)"]
+    end
+
+    TG <--> CHAT
+    TG --> AGENTS
+
+    subgraph BOARD["THE BOARD - shared files on the box (the only meeting place)"]
+        direction LR
+        CORPUS[("🧠 corpus<br/>index/*.db<br/><i>everything Twin knows</i>")]
+        NOTES["📌 state/<br/>cursors · sent-markers ·<br/>covered-topic lists"]
+        CHG["📖 CHANGELOG.md<br/><i>what we learned</i>"]
+        DATA["🏷 datasets/<br/>your verdicts · fixtures"]
+    end
+
+    ING -- "writes meeting summaries" --> CORPUS
+    BRIEF -- "reads" --> CORPUS
+    PREP -- "reads" --> CORPUS
+    CHAT -- "reads" --> CORPUS
+
+    BRIEF -- "notes to its future self" --> NOTES
+    RECAP -- "nudge-time + sent-marker" --> NOTES
+
+    US -- "writes learnings" --> CHG
+    CHG -- "brief TEACHES from top entry" --> BRIEF
+
+    BRIEF -- "saves each morning as a test case" --> DATA
+    DATA -- "eval gate replays them" --> US
+
+    style AGENTS fill:#eef4ff,stroke:#7aa2e8
+    style BOARD fill:#f2fbf2,stroke:#7cc47c
+</pre>
+</div>
+
+<div class="legend">
+  <b>How to read it:</b> there is not a single arrow between two agents - that's the whole design.
+  Each agent wakes up on its own schedule, reads what it needs from the board, does its one job, writes its result back, and exits.
+  <div class="rule">📐 <b>The one law of the board:</b> every file has exactly <b>one writer</b>; everyone else only reads.
+  (Both outages this week - the recap race and the Granola token death - were violations of this law.)</div>
+  <b>Examples you've lived:</b>
+  <ul>
+    <li><b>granola → brief:</b> the ingester drops summaries into the corpus; the brief just reads the corpus. They never meet.</li>
+    <li><b>brief → tomorrow's brief:</b> covered-topics lists in <code>state/</code> - an agent leaving notes for its future self.</li>
+    <li><b>us → brief:</b> we write a learning into the CHANGELOG; next morning the brief teaches it to you.</li>
+    <li><b>brief → the eval gate:</b> every real morning is saved as a fixture; the gate replays it before anything ships.</li>
+  </ul>
+  <b>What this pattern is called:</b> a <b>blackboard architecture</b> (1980s AI classic, now the 2025-26 industry standard for decoupled agents - Anthropic, Manus, and the FS-Researcher paper all converged on "files as the coordination medium").
+  <div class="rule">🧭 <b>Hermes is two things, not an orchestrator:</b> the <b>plumbing</b> (Telegram gateway + message history + delivery - pipes every agent uses) and <b>one peer agent</b> (the chat twin, for genuinely ambiguous work). The scheduled jobs are deterministic pipelines with at most one constrained LLM call.
+  <b>The rule:</b> agent loop where the task is ambiguous · pipeline where the task is predictable.</div>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", flowchart: { curve: "basis" } });
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+name: corpus-rag
+version: "0.1.0"
+description: "Auto-RAG: on every non-trivial user turn, run corpus-search and inject the top hits as context (via pre_llm_call). Removes the model's discretion to skip retrieval - fixes the corpus-dark failure. Fail-open."
+author: twin-mind
+hooks:
+  - pre_llm_call

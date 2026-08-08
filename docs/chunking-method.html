@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Twin Mind - Chunking Method</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0 auto; max-width: 1080px;
+         padding: 28px 32px 60px; background: #0d0f14; color: #e8ebf0; line-height: 1.55; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 14px; letter-spacing: .05em; text-transform: uppercase; color: #8b97a8; margin: 30px 0 12px; }
+  .thesis { color: #b7c0ce; font-size: 15px; margin: 0 0 8px; }
+  .thesis b { color: #6ee7a8; }
+  .card { background: #14171f; border: 1px solid #232936; border-radius: 12px; padding: 16px 22px; margin: 0 0 16px; }
+  .mermaid { display: flex; justify-content: center; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #1c2230; vertical-align: top; }
+  th { color: #8fb8ff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  code { background: #222a38; padding: 1px 6px; border-radius: 5px; font-size: 12.5px; color: #cfe0ff; }
+  a { color: #8fb8ff; }
+  .green { color: #6ee7a8; } .amber { color: #f0c674; }
+  ul { margin: 4px 0; padding-left: 20px; font-size: 13.5px; }
+  li { margin: 4px 0; color: #b7c0ce; }
+</style>
+</head>
+<body>
+  <h1>Twin Mind - Chunking Method</h1>
+  <p class="thesis">Window conversational data with overlap · <b>semantic-segment + summarize</b> the dense multi-topic sources (meetings, Claude Code) · then <b>contextual embedding</b> (Anthropic's Contextual Retrieval) before Cohere · retrieved by hybrid vector + BM25.</p>
+
+  <div class="card">
+    <pre class="mermaid">
+flowchart TB
+  N["normalized per-turn records"]:::src
+  N --> Q{"source type?"}:::dec
+  Q -->|"chat · imessage / gchat / transcripts"| W["WINDOW by conversation-day<br/>~400 tokens · ~25% overlap"]:::chunk
+  Q -->|"dense, multi-topic · meetings, Claude Code"| S["LLM SEMANTIC-SEGMENT + SUMMARIZE<br/>split on topic, not fixed size"]:::chunk
+  Q -->|"non-conv · gmail / gcal / contacts"| A["as-is · record = chunk"]:::chunk
+  W --> CTX["CONTEXTUAL PREFIX<br/>Anthropic Contextual Retrieval · +6.7"]:::ctx
+  S --> CTX
+  A --> CTX
+  CTX --> E["embed · Cohere Embed v3, 1024-d<br/>Bedrock eu-west-1"]:::emb
+  E --> DB[("sqlite-vec · vectors.db<br/>accumulates on the box")]:::store
+  DB --> SR["corpus-search · HYBRID<br/>vector + BM25, RRF fusion"]:::search
+
+  classDef src fill:#181c26,stroke:#3a4658,color:#e8ebf0;
+  classDef dec fill:#1c1330,stroke:#8957e5,color:#e0d4ff;
+  classDef chunk fill:#0f2417,stroke:#2ea043,color:#d6f5e2;
+  classDef ctx fill:#2a1e12,stroke:#b5762f,color:#f5dcc0;
+  classDef emb fill:#0f1f3d,stroke:#1f6feb,color:#cfe0ff;
+  classDef store fill:#101826,stroke:#2f5d9e,color:#cfe0ff;
+  classDef search fill:#12211a,stroke:#1f3b2c,color:#d6f5e2;
+    </pre>
+  </div>
+
+  <h2>Is this how the frontier does it? Yes - with one knob</h2>
+  <div class="card">
+    <table>
+      <tr><th>Our choice</th><th>Frontier verdict</th></tr>
+      <tr><td>Window ~400 tokens</td><td class="green">the sweet spot - 400-512 tokens is the recommended default (Chroma, NVIDIA, Firecrawl)</td></tr>
+      <tr><td>~25% overlap</td><td class="amber">a touch high - norm is 10-20%; Chroma found 50% is the *worst* (near-duplicates crowd top-k). A knob to test with retrieval_eval.</td></tr>
+      <tr><td>Contextual embedding</td><td class="green">literally Anthropic's Contextual Retrieval - "the largest single improvement, +5-7 pts, 90% of the way to optimal." Your +6.7 reproduced it.</td></tr>
+      <tr><td>Semantic-segment + summarize for CC/meetings</td><td class="green">exactly the guidance: semantic/LLM chunking wins on mixed-topic long-form (transcripts, heterogeneous sources); recursive-first then semantic only where topics don't align with structure</td></tr>
+      <tr><td>Hybrid vector + BM25 (RRF)</td><td class="green">Anthropic's Contextual BM25 - "embeddings + BM25 beats embeddings alone"</td></tr>
+      <tr><td>Measure on your own corpus</td><td class="green">the meta-rule everyone repeats - and you already do it (retrieval_eval, the earned +6.7)</td></tr>
+    </table>
+    <p class="thesis" style="margin-top:10px">One caveat the field keeps stressing: semantic chunking only beats fixed-size on genuinely mixed-topic content (NAACL 2025). Your Claude Code sessions - one terminal, many topics - are exactly that case, so it's the right call there and <b>not</b> for the clean chat threads.</p>
+  </div>
+
+  <h2>The articles</h2>
+  <div class="card">
+    <ul>
+      <li><b>Anthropic - Contextual Retrieval</b> (the method you're implementing): <a href="https://www.anthropic.com/engineering/contextual-retrieval">anthropic.com/engineering/contextual-retrieval</a></li>
+      <li><b>Claude Cookbook - Contextual Embeddings guide</b> (hands-on, with the exact prompt + prompt-caching): <a href="https://platform.claude.com/cookbook/capabilities-contextual-embeddings-guide">platform.claude.com/cookbook/capabilities-contextual-embeddings-guide</a></li>
+      <li><b>AWS - Contextual Retrieval on Bedrock Knowledge Bases</b> (Bedrock-native, your infra): <a href="https://aws.amazon.com/blogs/machine-learning/contextual-retrieval-in-anthropic-using-amazon-bedrock-knowledge-bases/">aws.amazon.com/blogs/machine-learning/contextual-retrieval-...</a></li>
+      <li><b>Firecrawl - Best Chunking Strategies for RAG 2026</b> (the window/overlap/semantic comparison + benchmarks): <a href="https://www.firecrawl.dev/blog/best-chunking-strategies-rag">firecrawl.dev/blog/best-chunking-strategies-rag</a></li>
+    </ul>
+  </div>
+</body>
+</html>

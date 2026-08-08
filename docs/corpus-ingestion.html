@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Twin Mind - Corpus Ingestion</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0 auto; max-width: 1080px;
+         padding: 28px 32px 60px; background: #0d0f14; color: #e8ebf0; line-height: 1.55; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 14px; letter-spacing: .05em; text-transform: uppercase; color: #8b97a8; margin: 30px 0 12px; }
+  .thesis { color: #b7c0ce; font-size: 15px; margin: 0 0 8px; }
+  .thesis b { color: #6ee7a8; }
+  .card { background: #14171f; border: 1px solid #232936; border-radius: 12px; padding: 16px 22px; margin: 0 0 16px; }
+  .mermaid { display: flex; justify-content: center; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #1c2230; vertical-align: top; }
+  th { color: #8fb8ff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  code { background: #222a38; padding: 1px 6px; border-radius: 5px; font-size: 12.5px; color: #cfe0ff; }
+  .legend { display: flex; gap: 20px; font-size: 13px; color: #9aa4b2; margin: 8px 0 0; flex-wrap: wrap; }
+  .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+  .green { color: #6ee7a8; } .amber { color: #f0c674; }
+</style>
+</head>
+<body>
+  <h1>Twin Mind - Corpus Ingestion</h1>
+  <p class="thesis">Daily cron. Read new Claude Code transcripts, scrub secrets on the Mac, embed with Cohere on Bedrock, and <b>append</b> to the same growing vector store as everything else. It <b>accumulates</b> - never a daily rebuild.</p>
+
+  <div class="card">
+    <pre class="mermaid">
+flowchart LR
+  CRON([daily cron]):::trig
+  CRON --> READ["read NEW Claude Code<br/>transcripts · ~/.claude/projects/*.jsonl"]:::mac
+  READ --> SCRUB["normalize + SCRUB SECRETS<br/>on the Mac · raw never leaves"]:::mac
+  SCRUB --> SHIP["ship scrubbed records → box (SSM)"]:::mac
+  SHIP --> EMB["embed · Cohere v3<br/>Bedrock eu-west-1"]:::box
+  MEET["Granola meetings<br/>(poller)"]:::box --> EMB
+  EMB --> APP["APPEND · idempotent upsert<br/>no rebuild"]:::box
+  APP --> DB[("vectors.db · sqlite-vec<br/>ACCUMULATES on the box")]:::store
+  HIST["historical corpus 2017-26"]:::box -. one-off .-> DB
+  DB --> SRCH["corpus-search · hybrid"]:::box
+  SRCH --> TWIN["Twin · brief · resurfacing<br/>· auto-RAG chat"]:::box
+
+  classDef trig fill:#1c1330,stroke:#8957e5,color:#e0d4ff;
+  classDef mac fill:#2a1e12,stroke:#b5762f,color:#f5dcc0;
+  classDef box fill:#0f2417,stroke:#2ea043,color:#d6f5e2;
+  classDef store fill:#0f1f3d,stroke:#1f6feb,color:#cfe0ff;
+    </pre>
+    <p class="legend">
+      <span><span class="chip" style="background:#8957e5"></span>trigger</span>
+      <span><span class="chip" style="background:#b5762f"></span>on the Mac (raw stays here)</span>
+      <span><span class="chip" style="background:#2ea043"></span>on the box (EC2)</span>
+      <span><span class="chip" style="background:#1f6feb"></span>the store</span>
+    </p>
+  </div>
+
+  <h2>The architecture, decided</h2>
+  <div class="card">
+    <table>
+      <tr><th>Choice</th><th>What we use</th><th>Note</th></tr>
+      <tr><td>Embedding model</td><td class="green">Cohere Embed Multilingual v3 (1024-dim)</td><td>via Bedrock eu-west-1 · <b>not Titan</b></td></tr>
+      <tr><td>Vector store</td><td class="green">sqlite-vec (one local file)</td><td><code>~/twin-corpus/index/vectors.db</code> · not a managed vector DB</td></tr>
+      <tr><td>AWS infra</td><td class="green">EC2 (the box) + Bedrock</td><td>store + retrieval are a local file on the box · no S3/OpenSearch for the corpus</td></tr>
+      <tr><td>Rebuild or append?</td><td class="green">APPEND - incremental upsert</td><td>delete-by-key then append <code>MAX(rowid)+1</code> · full rebuild only for the initial build</td></tr>
+      <tr><td>Secrets</td><td class="amber">scrubbed on the Mac</td><td>before anything leaves · the bearer token never gets embedded</td></tr>
+      <tr><td>Cadence</td><td class="green">daily cron</td><td>same shape as the existing Granola poller (launchd)</td></tr>
+    </table>
+  </div>
+
+  <p class="thesis" style="margin-top:18px">One new source normalizer (<code>normalize_claude_code.py</code>) + reuse the existing incremental embed path. Every session you have with Claude Code compounds into the same store the Twin already reads - the flywheel, made literal.</p>
+</body>
+</html>

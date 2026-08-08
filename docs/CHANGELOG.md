@@ -1,6 +1,53 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-08-04 - grounded the brief's AI ADVANCEMENTS in real news (Tavily); killed the fabrication
+
+The AI ADVANCEMENTS section had no news source - it was the model riffing from its weights.
+So it drifted from specific named items (mid-July: MiniMax, Qwen, OpenAI Astra) to generic essays that echoed Daniel's own changelog and invented lab measurements ("third-party audits routinely measure above 40 points" - no source).
+Fixed by making it a deterministic fetch, the same pattern as weather/inbox: code pulls the news, injects it as facts, the model only judges and cites.
+
+### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)
+
+**1. Ground a generative section by FETCHING facts in code, not by asking the model to "use real news"**
+`agents/brief/tools/prefetch.py` gained `ai_news`: a Tavily news search (official SDK, topic=news, one-week window, social/PR domains excluded) returning a compact sourced block, or `''` on any failure so the brief never breaks.
+`compose_brief.py` injects it as a RECENT AI NEWS facts block, and the SYS rule now forces `ai_advancements` to cite ONLY from that block and never invent a statistic.
+The model went from fabricating measurements to citing three real dated items (Shanghai AI Lab Shu'an, SageMaker Ground Truth Plus, Visa Agent Score) and dropping the junk (a stock page, a biopharma M&A) on its own.
+
+**2. Analysis of 34 sent briefs: reliability is perfect, one section is silently broken**
+31 consecutive days delivered at 07:30, no gaps; format locked ~07-15; the 07-24 "Friday 25 July" date-guess is gone (date is code-rendered now).
+But ONE TECHNICAL THING has shown `[code not found]` every day since ~07-28 - a regression: real code was injected on 07-16 (`run_regression.py`) and 07-21 (`bedrock_adapter.py`), then broke when the top changelog entry became a conceptual one with no Twin code file, so the model invents a path and the deterministic extractor correctly 404s.
+Fix is separate and pending: fail the teacher CLOSED to the real quiet-day item instead of shipping the 404 string.
+
+Shipped: prefetch.py `ai_news` + compose_brief grounding; tavily-python in the box venv; eval.sh green (9/9). Tavily key in ~/.hermes/.env (rotate it - it touched a chat transcript).
+
+## 2026-07-28 - practice day: deployed AWS's Strands+AgentCore eval sample end-to-end (not Twin code; learnings ledgered)
+
+### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)
+
+**1. The offline/online eval cost asymmetry, measured: ~1000x**
+Same eval framework, two runs: 85 offline tests with mock judges in 2.95s (~35ms/test) vs 18 deployed tests with a real agent + real LLM judges in 9m56s (~33s/test).
+That three-orders-of-magnitude gap is WHY eval architecture is layered: deterministic gate on every change, judged suite at deploy time, production SAMPLED (theirs: 3%) - never fully scored.
+
+**2. The onboarding path is the least-tested code in any repo**
+Following AWS's own README on a fresh machine + fresh-to-the-service account hit 7 gaps: missing `botocore[crt]` for modern `aws login` creds; immutable ECR tag breaking re-push; API Gateway's ancient account-level CloudWatch-logs role; agent deps living only in the Docker image (local tests import-error); sample data never uploaded (ingestion silently fell back to 3 default vehicles with a green 200); the runtime ARN buried in a machine-named export; AgentCore metrics needing account-level Transaction Search the README never mentions.
+Authors run the code hundreds of times and the first-hour path once; every difference between their world and yours surfaces as an undocumented error.
+Corollary: reproducibility extends exactly as far as a drawn boundary (container, IaC, lockfile) - everything that broke was OUTSIDE the boundaries (local env, account history, auth style). Twin has the same disease; nobody has a first hour on it.
+
+**3. "Is the system broken or is the ruler broken?" - twice in one day, in AWS's own code**
+(a) Their deployment validator KeyError'd on its own wrong S3 response shape and reported it as an infrastructure failure - a blanket `except Exception` turning a validator bug into a false alarm (the exact silent-default anti-pattern the structured-output rule kills).
+(b) Their CostEvaluator passed cases with "0 tokens, $0.00" on live LLM calls - green because the metadata was MISSING, not because cost was fine (a vacuous pass).
+Both caught by reading primary evidence (the API response, the numbers) instead of trusting the checker.
+
+**4. Smoke eval vs capability eval are different instruments**
+The post-deploy smoke ran trivial no-tool cases on purpose: it checks alive/safe/fast/cheap (latency vs budget, cost vs cap, data freshness, guardrails), not intelligence.
+Capability (real trajectories, judged output quality) lives in the deployed suite. Conflating them makes smoke slow and capability shallow.
+
+**5. Dataset size follows the variable under test**
+Their 4 dealer personas are ENOUGH - they test personalization behavior, not retrieval scale (53 vehicles, <1MB of vectors).
+Twin needed 30 labeled questions before chunking arms separated. n is set by what varies, not by ambition.
+Also: their stack is Twin's architecture in AWS clothing - EventBridge/Lambda ingestion = the pipeline, Titan 1024-dim = Cohere 1024-dim, LanceDB-files-on-S3 = sqlite-vec-file, contextualized descriptions = the contextual prefix, deterministic-veto gating (one safety violation fails the layer despite a high mean) = the 100% regression bar.
+
 ## 2026-07-27 - the eval flywheel synthesis: the grader ladder, datasets-are-code, UI-vs-CLI (reference diagram: docs/eval-flywheel.html)
 
 ### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)

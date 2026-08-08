@@ -98,6 +98,7 @@ def gather_facts():
         "technical_item": PF.technical_item(),
         "changelog": PF.changelog_top(),
         "technical_taught": technical_taught,
+        "ai_news": PF.ai_news(),
     }
 
 
@@ -112,12 +113,18 @@ SYS = (
     "facts: REPLIED-ALREADY means the ball left his court (skip); UNREAD + KNOWN + a question usually "
     "matters; deadlines and money always surface; newest evidence wins. Empty list if nothing needs "
     "him. No ready-to-send drafts.\n"
-    "- ai_advancements: 2-3 INSIGHT items about the AI world (not headlines). NEVER repeat anything on "
-    "the covered-topics list. Tie to Daniel's work only when natural.\n"
+    "- ai_advancements: 2-3 INSIGHT items drawn ONLY from the RECENT AI NEWS block. Pick the most "
+    "substantive advances (model releases, research results, real developer tools) and IGNORE stock, "
+    "marketing, funding, or off-topic items. Do NOT use anything outside the block, and NEVER invent a "
+    "statistic, benchmark number, or lab measurement. Turn each into one insight (not a headline) and cite "
+    "its source name + date. Skip anything on the covered-topics list. If nothing in the block is a real "
+    "advance, return an empty list. Tie to Daniel's work only when natural.\n"
     "- technical_thing: teach the concept under the TOP CHANGELOG ENTRY (what was just built or broke). "
     "concept = 3-4 sentences; code_path = the real file that entry references; code_symbol = the EXACT "
     "name of a function or class defined in that file to showcase (e.g. 'structured_call') - DO NOT write "
-    "any code, the system inserts the real lines for that symbol automatically; quiz + answer; topic = a "
+    "any code, the system inserts the real lines for that symbol automatically. If the concept has NO "
+    "real file in THIS repo (a purely external or conceptual item), set code_path and code_symbol to "
+    "EMPTY strings so the code block is omitted - NEVER invent a path. quiz + answer; topic = a "
     "2-4 word label. HARD RULE: topic must NOT be on the already-taught list - if the top entry's concept "
     "was already taught, teach a DIFFERENT concept from the entry, or use the quiet-day fallback item.\n"
     "- coach: ONE grounded nudge. GROUNDING (hard rule): only state a fact about Daniel that is dated "
@@ -131,6 +138,7 @@ def build_user(facts):
     return "\n".join([
         f"TODAY: {facts['date_line']}",
         f"\n=== AI TOPICS ALREADY COVERED (never repeat any) ===\n{facts['covered'][-1500:]}",
+        f"\n=== RECENT AI NEWS (the ONLY source for AI ADVANCEMENTS - cite from these; if empty, keep it short) ===\n{facts['ai_news'] or '(no items fetched today)'}",
         f"\n=== TOP CHANGELOG ENTRY (source for the technical section) ===\n{facts['changelog']}",
         f"\n=== TECHNICAL TOPICS ALREADY TAUGHT (do NOT teach any of these again) ===\n{facts['technical_taught'][-800:]}",
         f"\n=== QUIET-DAY FALLBACK TECHNICAL ITEM (only if the CHANGELOG entry is not teachable) ===\n{facts['technical_item']}",
@@ -181,20 +189,26 @@ def extract_symbol(repo_root, code_path, symbol):
 
 
 def compose_with_real_code(facts):
-    """Compose, then inject the REAL code for the symbol the model named. One retry if the symbol is
-    wrong (given the real options), then a visible fallback - never a silently fabricated quote."""
+    """Compose, then inject the REAL code for the symbol the model named. Fail CLOSED, never faked:
+    the model may set code_path empty when the concept has no repo code; if it names a path/symbol
+    that does not resolve, retry once with the real options; if it still does not resolve, return no
+    quote and render concept+quiz WITHOUT a code block. A '[not found]' string is never shipped."""
     brief = compose(facts)
     t = brief.technical_thing
+    if not (t.code_path or "").strip():          # model opted out - concept has no repo code
+        return brief, None
     quote, avail = extract_symbol(REPO, t.code_path, t.code_symbol)
-    if quote is None and avail:
-        hint = (f"\n\nCORRECTION: '{t.code_symbol}' is not defined in {t.code_path}. "
-                f"code_symbol MUST be exactly one of: {', '.join(avail[:20])}.")
+    if quote is None:                            # wrong symbol OR non-existent file - one correction
+        why = (f"code_symbol must be exactly one of: {', '.join(avail[:20])}." if avail
+               else f"'{t.code_path}' is not a file in this repo.")
+        hint = (f"\n\nCORRECTION: could not find '{t.code_symbol}' in '{t.code_path}'. {why} "
+                "Name a file that really exists and defines the symbol, OR if this concept has no "
+                "code in this repo, set code_path and code_symbol to empty strings.")
         brief = structured_call(MODEL, SYS, build_user(facts) + hint, Brief, max_tokens=3000)
         t = brief.technical_thing
-        quote, _ = extract_symbol(REPO, t.code_path, t.code_symbol)
-    if quote is None:
-        quote = f"[code for {t.code_symbol} not found in {t.code_path}]"
-    return brief, quote
+        quote = (None if not (t.code_path or "").strip()
+                 else extract_symbol(REPO, t.code_path, t.code_symbol)[0])
+    return brief, quote                          # None => render omits the code block (fail closed)
 
 
 # ---------- deterministic render (format is code, not a creative choice) ----------
@@ -208,8 +222,10 @@ def render(brief, facts, code_quote):
     L += ["", DIV, "TODAY", DIV, facts["weather"], *facts["calendar_lines"]]
     L += ["", DIV, "AI ADVANCEMENTS", DIV] + [f"- {a}" for a in brief.ai_advancements]
     t = brief.technical_thing
-    L += ["", DIV, "ONE TECHNICAL THING", DIV, t.concept, "", f"{t.code_path}:", code_quote,
-          "", f"Q: {t.quiz}", f"Answer: {t.answer}"]
+    L += ["", DIV, "ONE TECHNICAL THING", DIV, t.concept]
+    if code_quote and code_quote.strip():
+        L += ["", f"{t.code_path}:", code_quote]
+    L += ["", f"Q: {t.quiz}", f"Answer: {t.answer}"]
     L += ["", DIV, "COACH", DIV, brief.coach]
     L += ["", facts["reviewed_line"]]
     return "\n".join(L)
