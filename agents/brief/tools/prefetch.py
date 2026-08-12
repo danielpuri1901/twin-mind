@@ -8,7 +8,7 @@ Emits a structured text block:
   inbox since cursor - noise-filtered (tier 1), state-annotated (tier 2):
   unread / already-replied / known-contact.
 """
-import email, imaplib, json, os, re, subprocess, sys, time, urllib.request
+import email, html as _html, imaplib, json, os, re, subprocess, sys, time, urllib.request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from email.header import decode_header, make_header
@@ -22,15 +22,12 @@ for line in open(os.path.expanduser("~/.hermes/.env")):
         k, v = line.strip().split("=", 1)
         os.environ.setdefault(k, v)
 
-# Tier 1: known noise - the model never sees these (OPERATIONS.md skip-list)
-NOISE = ("linkedin.com", "medium.com", "nytimes.com", "theguardian.com", "masterclass.com",
-         "expressvpn", "dailystoic", "thuisbezorgd", "newyorkpizza", "sovendus", "duo.nl",
-         "urbanoutfitters", "kodekloud", "wispr", "startupschool@ycombinator.com",
-         "no-reply@flixbus", "nsinternational", "skratch", "pearle", "apple.com/news",
-         "glassdoor", "jobalert.indeed", "beehiiv", "rockhal", "youngla",
-         "marketing-ops@gurobi", "emcom.bankofamerica")
-# always-surface exceptions override the noise tier
-ALWAYS = ("costalerts.amazonaws.com", os.environ.get("TWIN_SMTP_ADDRESS", "").lower())
+# No code-side noise skip-list (removed 2026-08-11). The substring filter could silently
+# drop a real email whose From header merely contained a noise word (a recruiter's reply
+# nuked with no trace - the Bhairav/Tiff misses). We now pull EVERY inbox item since the
+# cursor WITH a body snippet + Gmail's own STARRED/IMPORTANT labels, and let the one LLM
+# call judge with full context. Tokens are trivial (~1k/brief); a false positive is far
+# cheaper than a silently-dropped technical screen.
 
 
 def out(title, body):
@@ -84,6 +81,31 @@ def replied_already(im_sent, subject, after_dt):
         return False
 
 
+def snippet(msg, maxlen=300):
+    """A clean plaintext preview of the body, so the model triages on content not just subject.
+    Prefers text/plain; falls back to text/html with tags stripped + entities decoded (so
+    HTML-only emails - like the CharacterQuilt screen - still get a readable snippet)."""
+    def decode(part):
+        try:
+            return (part.get_payload(decode=True) or b"").decode(
+                part.get_content_charset() or "utf-8", errors="replace")
+        except Exception:
+            return ""
+    plain = htmlbody = ""
+    for p in (msg.walk() if msg.is_multipart() else [msg]):
+        ct = p.get_content_type()
+        if ct == "text/plain" and not plain:
+            plain = decode(p)
+        elif ct == "text/html" and not htmlbody:
+            htmlbody = decode(p)
+    text = plain.strip() or htmlbody
+    if "<" in text and ">" in text:                          # strip HTML if that's all we have
+        text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", text)
+        text = _html.unescape(re.sub(r"<[^>]+>", " ", text))
+    text = re.sub(r"[​-‍⁠﻿­]+", "", text)   # drop invisible preheader padding
+    return re.sub(r"\s+", " ", text).strip()[:maxlen]
+
+
 def inbox():
     cutoff = datetime.now().astimezone() - timedelta(hours=24)
     try:
@@ -92,7 +114,7 @@ def inbox():
     except Exception:
         pass
     known = known_contacts()
-    rows, skipped = [], 0
+    rows = []
     with imaplib.IMAP4_SSL("imap.gmail.com") as im, imaplib.IMAP4_SSL("imap.gmail.com") as im2:
         im.login(os.environ["TWIN_SMTP_ADDRESS"], os.environ["TWIN_SMTP_APP_PASSWORD"])
         im2.login(os.environ["TWIN_SMTP_ADDRESS"], os.environ["TWIN_SMTP_APP_PASSWORD"])
@@ -102,11 +124,13 @@ def inbox():
         ok, d = im.search(None, f'(SINCE "{since}")')
         unparsed = 0
         for i in d[0].split():
-            ok, hdr = im.fetch(i, "(FLAGS BODY.PEEK[HEADER])")
+            # X-GM-LABELS carries Gmail's own \\Starred / \\Important (Gmail's triage, which we
+            # used to throw away); BODY.PEEK[] gets the body for the snippet without marking seen.
+            ok, resp = im.fetch(i, "(FLAGS X-GM-LABELS BODY.PEEK[])")
             try:
-                flags = next((x[0].decode() if isinstance(x[0], bytes) else str(x[0])
-                              for x in hdr if isinstance(x, tuple)), "")
-                raw = next((x[1] for x in hdr if isinstance(x, tuple) and isinstance(x[1], bytes)), b"")
+                meta = " ".join(x[0].decode(errors="replace") if isinstance(x[0], bytes) else str(x[0])
+                                for x in resp if isinstance(x, tuple))
+                raw = next((x[1] for x in resp if isinstance(x, tuple) and isinstance(x[1], bytes)), b"")
                 msg = email.message_from_bytes(raw)
                 dt = parsedate_to_datetime(msg.get("Date"))
                 if dt.timestamp() < cutoff.timestamp():
@@ -116,24 +140,29 @@ def inbox():
                 continue
             frm = str(make_header(decode_header(msg.get("From", "")))).lower()
             addr = (re.findall(r"[\w.+-]+@[\w-]+\.[\w.]+", frm) or [""])[0]
-            if any(n in frm for n in NOISE) and not any(a and a in frm for a in ALWAYS):
-                skipped += 1
-                continue
             subject = str(make_header(decode_header(msg.get("Subject", ""))))
-            unread = "\\Seen" not in flags
             rows.append({
                 "from": frm[:60], "subject": subject[:90], "date": dt.isoformat()[:16],
-                "unread": unread,
+                "unread": "\\Seen" not in meta,
+                "starred": "\\Starred" in meta,
+                "important": "\\Important" in meta,
                 "replied": replied_already(im2, subject, dt),
                 "known_contact": addr in known,
+                "body": snippet(msg),
             })
-    lines = [f"- [{'UNREAD' if r['unread'] else 'read'}"
-             f"{'|REPLIED-ALREADY' if r['replied'] else ''}"
-             f"{'|KNOWN' if r['known_contact'] else ''}] "
-             f"{r['date']} | {r['from']} | {r['subject']}" for r in rows]
-    return (f"(since cursor {cutoff.isoformat()[:16]}; {skipped} noise filtered by code; "
-            f"{unparsed} unparseable - if >0 investigate, never hide)\n"
-            + ("\n".join(lines) or "(no emails)")), len(rows)
+    lines = []
+    for r in rows:
+        flags = "UNREAD" if r["unread"] else "read"
+        flags += "|STARRED" if r["starred"] else ""
+        flags += "|IMPORTANT" if r["important"] else ""      # Gmail's own importance flag
+        flags += "|REPLIED-ALREADY" if r["replied"] else ""
+        flags += "|KNOWN" if r["known_contact"] else ""
+        line = f"- [{flags}] {r['date']} | {r['from']} | {r['subject']}"
+        if r["body"]:
+            line += f"\n    {r['body']}"
+        lines.append(line)
+    return (f"(ALL inbox since cursor {cutoff.isoformat()[:16]}; {unparsed} unparseable - if >0 investigate, "
+            f"never hide)\n" + ("\n".join(lines) or "(no emails)")), len(rows)
 
 
 def technical_item():

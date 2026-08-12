@@ -1,6 +1,23 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-08-12 - brief triages the inbox on full body + Gmail's own importance (stopped missing interview emails)
+
+The brief missed a CharacterQuilt technical screen (Bhairav) and a LangChain recruiter reply (Tiff Bell) - both real, both in-window, both past the noise filter.
+Root cause, confirmed by reading the actual Gmail: the brief handed the model only the SUBJECT line, and both subjects hid the ask (Bhairav's was bland; Tiff's still carried the stale July calendar-invite subject).
+
+### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)
+
+**1. Triage on content, not the subject line - and don't throw away Gmail's own signal**
+`agents/brief/tools/prefetch.py` `inbox` now pulls EVERY inbox item since the cursor (the substring noise skip-list - which could silently nuke a real email whose From header merely contained a noise word - is gone), each with a ~300-char HTML-stripped body snippet, plus Gmail's `\Starred` / `\Important` read via the X-GM-LABELS IMAP extension.
+`compose_brief.py`'s needs_you_today rule now reads the body + Gmail-importance and is told the inbox is unfiltered so it ignores the now-visible marketing.
+Verified live against the two missed emails: Bhairav surfaces via STARRED+IMPORTANT+body, Tiff via IMPORTANT+body. Cost of pulling all-with-bodies: ~1k tokens/brief (~12c/month) - a false positive is far cheaper than a silently-dropped technical screen.
+
+**2. A code-side pre-filter is the most dangerous component in a pipeline**
+The one thing that can drop a real signal with zero trace is a deterministic pre-filter. When tokens are cheap and the model has full context, inject everything and let the model judge - the filter's only value was keeping the prompt small, worthless at this volume.
+
+Shipped to the box: prefetch.py `inbox` (body + X-GM-LABELS, no skip-list) + compose_brief triage rule; also carried the queued #2 fail-closed teacher fix over. eval.sh green (9/9); prod verified (box pulls 30 emails with bodies+flags, Gmail IMPORTANT captured).
+
 ## 2026-08-04 - grounded the brief's AI ADVANCEMENTS in real news (Tavily); killed the fabrication
 
 The AI ADVANCEMENTS section had no news source - it was the model riffing from its weights.
