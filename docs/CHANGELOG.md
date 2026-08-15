@@ -1,6 +1,22 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-08-15 - novelty gate: the brief stops resurfacing the same AI items (semantic dedup in code)
+
+The AI ADVANCEMENTS section kept saying the same stuff. Root cause: dedup was the model's job - a phrase list pasted into the prompt with "don't repeat" - which it rephrases around, and the injected tail scrolls off so old items cycle back.
+
+### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)
+
+**1. Dedup is deterministic CODE, not the model's memory - filter before it sees the candidates**
+New `shared/novelty.py`: an append-only store of what the brief ACTUALLY surfaced, each with its Cohere embedding; `filter_novel(candidates)` drops any candidate within cosine 0.80 of anything seen, so the model only ever sees survivors - it cannot repeat what it never sees.
+Wired: `prefetch.ai_news()` filters the Tavily candidates; `compose_brief.main()` records the shipped insights after send.
+Calibrated on real Cohere v3 scores: near-duplicate rephrasings land 0.90+, a genuinely-new development on a covered topic ~0.61, unrelated <0.45 - so 0.80 drops repeats with margin while keeping new developments. Fail-open (any embed error returns all candidates; never blocks the brief). Reusable - LeadSense calls the same `filter_novel` / `record`.
+
+**2. Novelty needs a real feed; dedup only shapes what the feed brings in**
+A filter removes repeats but can't manufacture new content from a fixed distribution. The Tavily feed (added 08-04) is the source; the novelty gate is the second half.
+
+Shipped to the box: shared/novelty.py + prefetch/compose wire-ins; eval.sh green (9/9); prod verified (box gate drops a near-dup, keeps a novel item).
+
 ## 2026-08-12 - brief triages the inbox on full body + Gmail's own importance (stopped missing interview emails)
 
 The brief missed a CharacterQuilt technical screen (Bhairav) and a LangChain recruiter reply (Tiff Bell) - both real, both in-window, both past the noise filter.

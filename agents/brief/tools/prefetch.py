@@ -17,6 +17,7 @@ from email.utils import parsedate_to_datetime
 LUX = ZoneInfo("Europe/Luxembourg")  # Daniel's TZ - the box is in Ireland; pin the date to Luxembourg
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(HERE))))   # repo root, for shared.novelty
 for line in open(os.path.expanduser("~/.hermes/.env")):
     if "=" in line and not line.strip().startswith("#"):
         k, v = line.strip().split("=", 1)
@@ -225,6 +226,13 @@ def ai_news():
             exclude_domains=["instagram.com", "facebook.com", "tiktok.com", "medium.com",
                              "youtube.com", "reddit.com", "linkedin.com",
                              "prnewswire.com", "businesswire.com"])["results"]
+        try:   # novelty gate: drop items close to what the brief already surfaced (fail-open)
+            from shared.novelty import filter_novel
+            cands = [f"{h.get('title','')} {' '.join((h.get('content') or '').split())[:200]}" for h in hits]
+            keep = set(filter_novel(cands))
+            hits = [h for h, c in zip(hits, cands) if c in keep]
+        except Exception:
+            pass
         return "\n".join(
             f"- {h['title'].strip()} ({(h.get('published_date') or '')[:10]}) - "
             f"{' '.join((h.get('content') or '').split())[:220]} [{h.get('url', '')}]"

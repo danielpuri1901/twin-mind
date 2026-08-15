@@ -255,6 +255,11 @@ def main():
             f.write(f"{facts['date_subject']}: {brief.technical_thing.topic}\n")
     except Exception:
         pass
+    try:  # record the AI-advancement insights actually surfaced -> semantic novelty gate next run
+        from shared.novelty import record as record_seen
+        record_seen(brief.ai_advancements)
+    except Exception:
+        pass
     try:  # every real morning is a benchmark fixture forever
         os.makedirs(FIXTURE_DIR, exist_ok=True)
         open(os.path.join(FIXTURE_DIR, datetime.now(PF.LUX).strftime("%Y-%m-%d") + ".txt"), "w").write(build_user(facts))
