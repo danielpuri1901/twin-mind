@@ -116,7 +116,7 @@ def _commit_events(repo: Path, home: Path, cutoff: datetime) -> list[dict]:
 
 
 def _status_entries(repo: Path) -> list[tuple[str, str]]:
-    raw = _git(repo, "status", "--porcelain=v1", "--untracked-files=normal", "-z")
+    raw = _git(repo, "status", "--porcelain=v1", "--untracked-files=all", "-z")
     records = raw.split("\0")
     entries: list[tuple[str, str]] = []
     skip_rename_source = False

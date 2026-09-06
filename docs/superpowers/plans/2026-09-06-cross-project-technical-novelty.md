@@ -104,7 +104,7 @@ Do not impose a depth limit, because a real project may live deeper under the ho
 Use list-form `subprocess.run()` calls to `git -C <repo>` with five-second timeouts.
 Collect at most 20 non-merge commits per repository from the last 14 days.
 Use `%H`, `%ct`, and `%s` plus `--name-only` for commit metadata.
-Use `git status --porcelain=v1 --untracked-files=normal` for working-tree names.
+Use `git status --porcelain=v1 --untracked-files=all` so nested untracked filenames remain visible.
 Build dirty fingerprints from normalized status lines, never from file bytes.
 Use file modification time only to avoid importing old dirty trees during bootstrap.
 

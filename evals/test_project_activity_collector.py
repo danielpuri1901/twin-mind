@@ -71,6 +71,20 @@ class CollectorTests(unittest.TestCase):
             self.assertNotIn("TRACKED_SECRET", encoded)
             self.assertNotIn("UNTRACKED_SECRET", encoded)
 
+    def test_nested_untracked_files_are_named_individually(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            repo = make_repo(home / "project")
+            commit_files(repo, "initial", {"app.py": "pass\n"})
+            nested = repo / "new" / "feature.py"
+            nested.parent.mkdir()
+            nested.write_text("PRIVATE_SOURCE")
+
+            encoded = json.dumps(collector.collect_snapshot(home, datetime.now(timezone.utc)))
+
+            self.assertIn("new/feature.py", encoded)
+            self.assertNotIn("PRIVATE_SOURCE", encoded)
+
     def test_discovery_prunes_noise_without_a_depth_limit(self):
         with tempfile.TemporaryDirectory() as raw:
             home = Path(raw)
