@@ -94,6 +94,61 @@ class CollectorTests(unittest.TestCase):
 
             self.assertEqual(collector.discover_repositories(home), [wanted.resolve()])
 
+    def test_discovery_includes_linked_worktrees(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            repo = make_repo(home / "project")
+            commit_files(repo, "initial", {"app.py": "pass\n"})
+            git(repo, "branch", "feature")
+            worktree = repo / ".worktrees" / "feature"
+            git(repo, "worktree", "add", "-q", str(worktree), "feature")
+            feature_id = commit_files(worktree, "feat: linked worktree", {"feature.py": "pass\n"})
+
+            repositories = collector.discover_repositories(home)
+            snapshot = collector.collect_snapshot(home, datetime.now(timezone.utc))
+
+            self.assertIn(repo.resolve(), repositories)
+            self.assertIn(worktree.resolve(), repositories)
+            feature = next(event for event in snapshot["events"] if event["event_id"] == feature_id)
+            self.assertEqual(feature["project"], "project")
+            self.assertEqual(feature["paths"], ["feature.py"])
+            event_ids = [event["event_id"] for event in snapshot["events"]]
+            self.assertEqual(len(event_ids), len(set(event_ids)))
+
+    def test_dirty_ids_are_namespaced_by_repository(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            first = make_repo(home / "first")
+            second = make_repo(home / "second")
+            commit_files(first, "initial", {"app.py": "pass\n"})
+            commit_files(second, "initial", {"app.py": "pass\n"})
+            (first / "draft.py").write_text("one")
+            (second / "draft.py").write_text("two")
+
+            snapshot = collector.collect_snapshot(home, datetime.now(timezone.utc))
+            dirty_ids = [event["event_id"] for event in snapshot["events"] if event["kind"] == "dirty"]
+
+            self.assertEqual(len(dirty_ids), 2)
+            self.assertEqual(len(set(dirty_ids)), 2)
+
+    def test_current_deletion_is_not_filtered_by_index_mtime(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            repo = make_repo(home / "project")
+            commit_files(repo, "initial", {"delete.py": "remove me"})
+            os.utime(repo / ".git" / "index", (1, 1))
+            (repo / "delete.py").unlink()
+
+            snapshot = collector.collect_snapshot(home, datetime.now(timezone.utc))
+            dirty_paths = [
+                path
+                for event in snapshot["events"]
+                if event["kind"] == "dirty"
+                for path in event["paths"]
+            ]
+
+            self.assertIn("delete.py", dirty_paths)
+
     def test_sensitive_and_generated_paths_are_excluded(self):
         with tempfile.TemporaryDirectory() as raw:
             home = Path(raw)
@@ -103,12 +158,28 @@ class CollectorTests(unittest.TestCase):
             (repo / "credentials.json").write_text("secret")
             (repo / "out").mkdir()
             (repo / "out" / "generated.py").write_text("secret")
+            (repo / "vendor").mkdir()
+            (repo / "vendor" / "package.py").write_text("secret")
+            (repo / "target").mkdir()
+            (repo / "target" / "artifact.py").write_text("secret")
+            (repo / "coverage").mkdir()
+            (repo / "coverage" / "report.json").write_text("secret")
+            (repo / "secrets.py").write_text("secret")
+            (repo / "token.txt").write_text("secret")
+            (repo / ".ssh").mkdir()
+            (repo / ".ssh" / "id_rsa").write_text("secret")
 
             encoded = json.dumps(collector.collect_snapshot(home, datetime.now(timezone.utc)))
 
             self.assertNotIn(".env", encoded)
             self.assertNotIn("credentials.json", encoded)
             self.assertNotIn("generated.py", encoded)
+            self.assertNotIn("package.py", encoded)
+            self.assertNotIn("artifact.py", encoded)
+            self.assertNotIn("report.json", encoded)
+            self.assertNotIn("secrets.py", encoded)
+            self.assertNotIn("token.txt", encoded)
+            self.assertNotIn("id_rsa", encoded)
 
     def test_write_snapshot_replaces_the_destination(self):
         with tempfile.TemporaryDirectory() as raw:

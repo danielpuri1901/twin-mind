@@ -73,8 +73,8 @@ A failed send records neither as delivered and reports failure instead of announ
 
 ## Cost
 
-A read-only benchmark on 2026-09-06 discovered 64 repositories and 36 recent events in 2.1 seconds.
-The resulting snapshot was 10.7 KB.
+A read-only benchmark on 2026-09-06 discovered 66 repositories and 39 recent events in 3.4 seconds.
+The resulting snapshot was 14.5 KB.
 The production schedule performs this scan once per day plus once at login.
 It uses no web search and no Mac-side model call.
 The existing brief keeps one composition call with a prompt similar in size to the current changelog input.

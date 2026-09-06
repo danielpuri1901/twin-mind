@@ -102,6 +102,17 @@ class ComposeBriefTests(unittest.TestCase):
         self.assertIsNone(vector)
         model_call.assert_called_once()
 
+    def test_invalid_project_keeps_matching_source_for_rejection_state(self):
+        made = brief(project="invented")
+        with mock.patch.object(compose, "compose", return_value=made):
+            result, selected, status, _semantic, _vector = compose.compose_with_technical_gate(
+                {"technical_candidates": [cluster()]}
+            )
+
+        self.assertIsNone(result.technical_thing)
+        self.assertEqual(selected, cluster())
+        self.assertEqual(status, "rejected_invalid")
+
     def test_render_omits_optional_technical_section(self):
         made = brief()
         made.technical_thing = None

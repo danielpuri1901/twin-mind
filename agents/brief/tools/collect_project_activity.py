@@ -9,6 +9,7 @@ import os
 import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -23,11 +24,16 @@ EXCLUDED_DIRS = {
     ".codex", ".claude", ".agents", ".hermes", "node_modules",
     ".venv", "venv", "env", "dist", "build", "out", "outputs",
     "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    "vendor", "target", "coverage", ".next", ".turbo", ".terraform",
+    ".output", ".ssh", ".aws", ".gnupg", "Pods", "DerivedData",
 }
+EXCLUDED_DIRS_LOWER = {directory.lower() for directory in EXCLUDED_DIRS}
 EXCLUDED_NAMES = {
     ".env", ".env.local", ".env.production", "credentials",
-    "credentials.json", "secrets.json",
+    "credentials.json", "secrets.json", ".npmrc", ".pypirc",
+    "id_rsa", "id_ed25519",
 }
+SENSITIVE_NAME_WORDS = {"secret", "secrets", "credential", "credentials", "token", "tokens"}
 EXCLUDED_SUFFIXES = {
     ".lock", ".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mov",
     ".zip", ".tar", ".gz", ".pdf", ".db", ".sqlite", ".sqlite3",
@@ -50,15 +56,16 @@ def discover_repositories(home: Path) -> list[Path]:
     """Find user projects while pruning caches, histories, vendors, and generated trees."""
     home = home.resolve()
     repositories: list[Path] = []
-    for root, dirs, _files in os.walk(home):
+    for root, dirs, files in os.walk(home):
         dirs[:] = sorted(
             directory for directory in dirs
-            if directory == ".git"
+            if directory in {".git", ".worktrees"}
             or (directory not in EXCLUDED_DIRS and not directory.startswith("."))
         )
-        if ".git" in dirs:
+        if ".git" in dirs or ".git" in files:
             repositories.append(Path(root))
-            dirs.remove(".git")
+            if ".git" in dirs:
+                dirs.remove(".git")
     return sorted(repositories)
 
 
@@ -67,18 +74,28 @@ def _allowed_path(raw_path: str) -> bool:
     if not path:
         return False
     parts = Path(path).parts
-    if any(part in EXCLUDED_DIRS for part in parts):
+    if any(part.lower() in EXCLUDED_DIRS_LOWER for part in parts):
         return False
     name = Path(path).name.lower()
     if name in EXCLUDED_NAMES or name.startswith(".env."):
         return False
+    name_words = set(name.replace("-", "_").replace(".", "_").split("_"))
+    if name_words & SENSITIVE_NAME_WORDS:
+        return False
     return Path(name).suffix.lower() not in EXCLUDED_SUFFIXES
 
 
+@lru_cache(maxsize=None)
 def _repo_identity(repo: Path, home: Path) -> tuple[str, str]:
     relative = repo.resolve().relative_to(home.resolve()).as_posix()
     repo_id = hashlib.sha256(relative.encode()).hexdigest()[:16]
-    return repo.name, repo_id
+    common_raw = _git(repo, "rev-parse", "--git-common-dir").strip()
+    common = Path(common_raw)
+    if not common.is_absolute():
+        common = repo / common
+    common = common.resolve()
+    project = common.parent.name if common.name == ".git" else repo.name
+    return project, repo_id
 
 
 def _commit_events(repo: Path, home: Path, cutoff: datetime) -> list[dict]:
@@ -136,15 +153,12 @@ def _status_entries(repo: Path) -> list[tuple[str, str]]:
 
 
 def _path_mtime(repo: Path, status: str, path: str, now: datetime) -> float:
+    if "D" in status:
+        return now.timestamp()
     try:
         return (repo / path).stat().st_mtime
     except OSError:
-        if "D" not in status:
-            return 0.0
-        try:
-            return (repo / ".git" / "index").stat().st_mtime
-        except OSError:
-            return now.timestamp()
+        return 0.0
 
 
 def _dirty_event(repo: Path, home: Path, cutoff: datetime, now: datetime) -> Optional[dict]:
@@ -163,7 +177,7 @@ def _dirty_event(repo: Path, home: Path, cutoff: datetime, now: datetime) -> Opt
         mtimes.append(modified)
     if not entries:
         return None
-    normalized = "\n".join(sorted(entries))
+    normalized = f"{repo_id}\n" + "\n".join(sorted(entries))
     return {
         "event_id": "dirty:" + hashlib.sha256(normalized.encode()).hexdigest(),
         "kind": "dirty",
@@ -189,6 +203,10 @@ def collect_snapshot(home: Path, now: datetime, lookback_days: int = 14) -> dict
                 events.append(dirty)
         except (OSError, subprocess.SubprocessError, ValueError):
             continue
+    unique_events = {}
+    for event in events:
+        unique_events.setdefault(event["event_id"], event)
+    events = list(unique_events.values())
     events.sort(key=lambda event: (-event["time"], event["project"].lower(), event["event_id"]))
     return {
         "schema_version": SCHEMA_VERSION,

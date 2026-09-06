@@ -195,8 +195,15 @@ def compose_with_technical_gate(facts):
     semantic = technical_text(technical)
     selected = validate_technical_source(brief, facts["technical_candidates"])
     if selected is None:
+        rejected = next(
+            (
+                candidate for candidate in facts["technical_candidates"]
+                if candidate.cluster_id == technical.source_id
+            ),
+            None,
+        )
         brief.technical_thing = None
-        return brief, None, "rejected_invalid", semantic, None
+        return brief, rejected, "rejected_invalid", semantic, None
     checked = filter_novel_with_vectors([semantic], store=PA.NOVELTY_STORE, fail_open=False)
     if not checked:
         brief.technical_thing = None
