@@ -78,11 +78,13 @@ def gather_facts():
                          capture_output=True, text=True, timeout=60).stdout.strip()
     inbox_text, n = PF.inbox()
     try:
-        cursor = open(os.path.expanduser("~/.hermes/state/last_brief_sent")).read().strip()[:16]
+        with open(os.path.expanduser("~/.hermes/state/last_brief_sent"), encoding="utf-8") as handle:
+            cursor = handle.read().strip()[:16]
     except Exception:
         cursor = "the last 24h"
     try:
-        covered = open(os.path.expanduser("~/.hermes/state/digest-covered.txt")).read().strip()
+        with open(os.path.expanduser("~/.hermes/state/digest-covered.txt"), encoding="utf-8") as handle:
+            covered = handle.read().strip()
     except Exception:
         covered = "(none yet)"
     technical_candidates = PA.shortlist() if PA.ensure_technical_history() else []
