@@ -43,14 +43,23 @@ def _cos(a, b):
     return dot / (na * nb) if na and nb else 0.0
 
 
-def _load(store):
+def _load(store, *, fail_open=True):
+    path = os.path.expanduser(store)
     try:
-        return [json.loads(ln) for ln in open(os.path.expanduser(store)) if ln.strip()]
-    except Exception:
+        with open(path, encoding="utf-8") as handle:
+            rows = [json.loads(line) for line in handle if line.strip()]
+    except FileNotFoundError:
         return []
+    except Exception:
+        if fail_open:
+            return []
+        raise
+    if not fail_open and any(not row.get("vec") for row in rows):
+        raise ValueError(f"novelty store has unembedded rows: {path}")
+    return rows
 
 
-def filter_novel(candidates, store=AI_STORE, threshold=0.80):
+def filter_novel(candidates, store=AI_STORE, threshold=0.80, fail_open=True):
     """Return the subset of `candidates` (strings) NOT semantically seen before.
     threshold = cosine at/above which a candidate counts as a repeat. Calibrated on real
     Cohere v3 scores (2026-08-15): near-duplicate rephrasings land ~0.90+, a genuinely new
@@ -61,7 +70,7 @@ def filter_novel(candidates, store=AI_STORE, threshold=0.80):
     if not candidates:
         return []
     try:
-        seen = [row["vec"] for row in _load(store) if row.get("vec")]
+        seen = [row["vec"] for row in _load(store, fail_open=fail_open) if row.get("vec")]
         if not seen:
             return candidates
         out = []
@@ -70,7 +79,7 @@ def filter_novel(candidates, store=AI_STORE, threshold=0.80):
                 out.append(cand)
         return out
     except Exception:
-        return candidates
+        return candidates if fail_open else []
 
 
 def record(items, store=AI_STORE):

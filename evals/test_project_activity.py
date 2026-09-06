@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Deterministic tests for technical activity clustering and novelty."""
+import json
+import sys
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parents[1]
+TOOLS = ROOT / "agents" / "brief" / "tools"
+sys.path.insert(0, str(TOOLS))
+sys.path.insert(0, str(ROOT))
+
+import project_activity as activity
+from shared import novelty
+
+NOW = datetime.now(timezone.utc)
+
+
+def event(
+    event_id: str,
+    project: str,
+    timestamp: int,
+    subject: str,
+    paths: list[str],
+    repo_id: str | None = None,
+) -> dict:
+    return {
+        "event_id": event_id,
+        "kind": "commit",
+        "project": project,
+        "repo_id": repo_id or project,
+        "time": timestamp,
+        "subject": subject,
+        "paths": paths,
+    }
+
+
+def write_snapshot(path: Path, events: list[dict], generated_at: int | None = None) -> None:
+    path.write_text(json.dumps({
+        "schema_version": 1,
+        "generated_at": generated_at or int(NOW.timestamp()),
+        "lookback_days": 14,
+        "events": events,
+    }))
+
+
+class ProjectActivityTests(unittest.TestCase):
+    def test_related_agentlab_commits_become_one_work_session(self):
+        clusters = activity.cluster_events([
+            event("a", "agentlab", 1000, "feat: compose story videos", ["worker.py"]),
+            event("b", "agentlab", 2000, "fix: enforce timing limits", ["worker.py", "video.py"]),
+            event("c", "agentlab", 3000, "fix: harden story quality", ["video.py"]),
+        ])
+
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(clusters[0].event_ids, ("a", "b", "c"))
+        self.assertEqual(clusters[0].project, "agentlab")
+
+    def test_different_repositories_and_distant_commits_do_not_cluster(self):
+        clusters = activity.cluster_events([
+            event("a", "agentlab", 1000, "feat: worker", ["worker.py"]),
+            event("b", "other", 2000, "fix: worker", ["worker.py"]),
+            event("c", "agentlab", 1000 + 7 * 3600, "fix: worker", ["worker.py"]),
+        ])
+
+        self.assertEqual(len(clusters), 3)
+
+    def test_shortlist_prefers_technical_work_and_drops_noise(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            snapshot = root / "snapshot.json"
+            write_snapshot(snapshot, [
+                event("feature", "agentlab", 3000, "feat: guarded story generation", ["worker.py", "tests/test_worker.py"]),
+                event("docs", "notes", 4000, "docs: update readme", ["README.md"]),
+                event("deps", "demo", 5000, "chore: dependency bump", ["requirements.txt"]),
+            ])
+            with mock.patch.object(activity, "filter_novel", side_effect=lambda texts, **kwargs: texts):
+                rows = activity.shortlist(str(snapshot), str(root / "handled.jsonl"), str(root / "seen.jsonl"))
+
+            self.assertEqual([row.project for row in rows], ["agentlab"])
+
+    def test_handled_events_are_not_shortlisted(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            snapshot = root / "snapshot.json"
+            handled = root / "handled.jsonl"
+            source = event("done", "agentlab", 3000, "feat: guarded worker", ["worker.py"])
+            write_snapshot(snapshot, [source])
+            cluster = activity.cluster_events([source])[0]
+            activity.record_handled(cluster, "delivered", str(handled))
+
+            with mock.patch.object(activity, "filter_novel", side_effect=lambda texts, **kwargs: texts):
+                rows = activity.shortlist(str(snapshot), str(handled), str(root / "seen.jsonl"))
+
+            self.assertEqual(rows, [])
+
+    def test_stale_or_invalid_snapshot_fails_closed(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            stale = root / "stale.json"
+            invalid = root / "invalid.json"
+            write_snapshot(stale, [event("a", "agentlab", 1000, "feat: worker", ["worker.py"])], generated_at=1)
+            invalid.write_text('{"schema_version": 99}')
+
+            self.assertEqual(activity.shortlist(str(stale), "missing", "missing"), [])
+            self.assertEqual(activity.shortlist(str(invalid), "missing", "missing"), [])
+
+    def test_technical_novelty_fails_closed_but_ai_default_stays_open(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store = Path(raw) / "seen.jsonl"
+            store.write_text(json.dumps({"text": "old", "vec": [1.0]}) + "\n")
+            with mock.patch.object(novelty, "_embed", side_effect=RuntimeError("down")):
+                self.assertEqual(novelty.filter_novel(["candidate"], store=str(store), fail_open=False), [])
+                self.assertEqual(novelty.filter_novel(["candidate"], store=str(store)), ["candidate"])
+
+    def test_missing_store_is_empty_history_but_broken_rows_fail_closed(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            missing = root / "missing.jsonl"
+            broken = root / "broken.jsonl"
+            broken.write_text(json.dumps({"text": "unembedded"}) + "\n")
+
+            self.assertEqual(novelty.filter_novel(["candidate"], store=str(missing), fail_open=False), ["candidate"])
+            self.assertEqual(novelty.filter_novel(["candidate"], store=str(broken), fail_open=False), [])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
