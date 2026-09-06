@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 SCHEMA_VERSION = 1
 DEFAULT_OUTPUT = Path("~/twin-corpus/notes/project-activity.json").expanduser()
@@ -92,7 +93,7 @@ def _commit_events(repo: Path, home: Path, cutoff: datetime) -> list[dict]:
         "--name-only",
     )
     events: list[dict] = []
-    current: dict | None = None
+    current: Optional[dict] = None
     for line in raw.splitlines():
         if line.startswith("@@"):
             if current and current["paths"]:
@@ -146,7 +147,7 @@ def _path_mtime(repo: Path, status: str, path: str, now: datetime) -> float:
             return now.timestamp()
 
 
-def _dirty_event(repo: Path, home: Path, cutoff: datetime, now: datetime) -> dict | None:
+def _dirty_event(repo: Path, home: Path, cutoff: datetime, now: datetime) -> Optional[dict]:
     project, repo_id = _repo_identity(repo, home)
     entries = []
     paths = []

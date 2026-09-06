@@ -53,6 +53,19 @@ def brief(source_id: str = "real", project: str = "agentlab") -> compose.Brief:
 
 
 class ComposeBriefTests(unittest.TestCase):
+    def test_gather_facts_hides_candidates_when_history_seed_fails(self):
+        with mock.patch.object(compose.PA, "ensure_technical_history", return_value=False):
+            with mock.patch.object(compose.PA, "shortlist") as shortlist:
+                with mock.patch.object(compose.PF, "inbox", return_value=("", 0)):
+                    with mock.patch.object(compose.PF, "weather", return_value="clear"):
+                        with mock.patch.object(compose.PF, "ai_news", return_value=""):
+                            with mock.patch.object(compose.subprocess, "run") as run:
+                                run.return_value.stdout = ""
+                                facts = compose.gather_facts()
+
+        self.assertEqual(facts["technical_candidates"], [])
+        shortlist.assert_not_called()
+
     def test_prompt_uses_project_candidates_instead_of_the_stale_changelog(self):
         facts = {
             "date_line": "Sunday, 6 September 2026",

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,7 +26,7 @@ def event(
     timestamp: int,
     subject: str,
     paths: list[str],
-    repo_id: str | None = None,
+    repo_id: Optional[str] = None,
 ) -> dict:
     return {
         "event_id": event_id,
@@ -38,7 +39,7 @@ def event(
     }
 
 
-def write_snapshot(path: Path, events: list[dict], generated_at: int | None = None) -> None:
+def write_snapshot(path: Path, events: list[dict], generated_at: Optional[int] = None) -> None:
     path.write_text(json.dumps({
         "schema_version": 1,
         "generated_at": generated_at or int(NOW.timestamp()),
@@ -48,6 +49,62 @@ def write_snapshot(path: Path, events: list[dict], generated_at: int | None = No
 
 
 class ProjectActivityTests(unittest.TestCase):
+    def test_legacy_topics_seed_the_semantic_store_atomically(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            legacy = root / "technical-covered.txt"
+            store = root / "seen-technical.jsonl"
+            legacy.write_text(
+                "2026-07-24: prompt caching\n"
+                "Saturday 25 July: Structured output enforcement\n"
+            )
+            vectors = [
+                ("prompt caching", [1.0, 0.0]),
+                ("Structured output enforcement", [0.0, 1.0]),
+            ]
+
+            with mock.patch.object(activity, "filter_novel_with_vectors", return_value=vectors) as embed:
+                seeded = activity.ensure_technical_history(str(legacy), str(store))
+
+            self.assertTrue(seeded)
+            embed.assert_called_once_with(
+                ["prompt caching", "Structured output enforcement"],
+                store=mock.ANY,
+                fail_open=False,
+            )
+            rows = [json.loads(line) for line in store.read_text().splitlines()]
+            self.assertEqual([row["text"] for row in rows], [item[0] for item in vectors])
+            self.assertTrue(all(row["vec"] for row in rows))
+            self.assertEqual(list(root.glob("*.tmp")), [])
+
+    def test_existing_semantic_store_is_never_reseeded(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            legacy = root / "technical-covered.txt"
+            store = root / "seen-technical.jsonl"
+            legacy.write_text("2026-07-24: prompt caching\n")
+            store.write_text(json.dumps({"text": "existing", "vec": [1.0]}) + "\n")
+
+            with mock.patch.object(activity, "filter_novel_with_vectors") as embed:
+                seeded = activity.ensure_technical_history(str(legacy), str(store))
+
+            self.assertTrue(seeded)
+            embed.assert_not_called()
+            self.assertEqual(json.loads(store.read_text())["text"], "existing")
+
+    def test_legacy_seed_fails_closed_when_embedding_fails(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            legacy = root / "technical-covered.txt"
+            store = root / "seen-technical.jsonl"
+            legacy.write_text("2026-07-24: prompt caching\n")
+
+            with mock.patch.object(activity, "filter_novel_with_vectors", return_value=[]):
+                seeded = activity.ensure_technical_history(str(legacy), str(store))
+
+            self.assertFalse(seeded)
+            self.assertFalse(store.exists())
+
     def test_related_agentlab_commits_become_one_work_session(self):
         clusters = activity.cluster_events([
             event("a", "agentlab", 1000, "feat: compose story videos", ["worker.py"]),

@@ -25,6 +25,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime
+from typing import Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))   # tools->brief->agents->super-project
@@ -64,7 +65,7 @@ class Brief(BaseModel):
     and the TODAY block (weather + calendar) are rendered deterministically by code, never here."""
     needs_you_today: list[NeedsItem]   # section 1; empty list if nothing needs a decision
     ai_advancements: list[str]         # section 3; 2-3 insight items, none on the covered list
-    technical_thing: TechnicalThing | None  # absent when no fresh technical lesson survives
+    technical_thing: Optional[TechnicalThing]  # absent when no fresh technical lesson survives
     coach: str                         # section 5; one grounded nudge
 
 
@@ -83,7 +84,7 @@ def gather_facts():
         covered = open(os.path.expanduser("~/.hermes/state/digest-covered.txt")).read().strip()
     except Exception:
         covered = "(none yet)"
-    technical_candidates = PA.shortlist()
+    technical_candidates = PA.shortlist() if PA.ensure_technical_history() else []
     return {
         "date_subject": f"{now.strftime('%A')} {now.day} {now.strftime('%B')}",
         "date_line": f"{now.strftime('%A')}, {now.day} {now.strftime('%B %Y')} (Europe/Luxembourg)",

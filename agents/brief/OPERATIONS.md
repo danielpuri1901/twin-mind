@@ -33,6 +33,41 @@ YC rejections without follow-up instructions.
 ## Always surface: AWS budget alerts, self-sent emails (Daniel's reminders to himself), unanswered
 calendar invites from known contacts, supervisor emails with deadline language, bank security alerts.
 
-## Digest item selection
-(day_of_year - 1) % item_count from digest-queue.md - RECOUNT item_count each run (the list grows).
-Find the exact code the item points at by READING the file - never quote from memory.
+## Cross-project technical activity
+
+The Mac collector discovers Git repositories dynamically under Daniel's home folder.
+It publishes commit metadata and changed filenames only.
+It never publishes source contents, untracked contents, commit bodies, absolute paths, credentials, environment files, media, databases, generated output, dependency trees, or lockfiles.
+
+Run and publish manually:
+
+```bash
+/usr/bin/python3 "/Users/danielpuri/Super Project/agents/brief/tools/collect_project_activity.py" --publish
+```
+
+The local snapshot is `~/twin-corpus/notes/project-activity.json`.
+The remote snapshot is `/home/ec2-user/twin-corpus/notes/project-activity.json`.
+Publication uses the existing `twin-mind` SSH host over AWS SSM.
+The remote snapshot remains intact when collection, AWS authentication, SSH, or publication fails.
+The brief ignores malformed snapshots and snapshots older than 30 days.
+On the first run, the brief embeds the old `technical-covered.txt` topics once and atomically seeds the semantic novelty store.
+If that migration fails, the technical section stays empty rather than forgetting prior lessons.
+
+Install or refresh the LaunchAgent:
+
+```bash
+mkdir -p "$HOME/.hermes/logs"
+cp "/Users/danielpuri/Super Project/agents/brief/com.twinmind.brief-project-activity.plist" "$HOME/Library/LaunchAgents/"
+launchctl bootout "gui/$(id -u)/com.twinmind.brief-project-activity" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.twinmind.brief-project-activity.plist"
+```
+
+The job runs at login and at 07:00 local time before the 07:30 brief.
+Its logs are `~/.hermes/logs/project-activity.out.log` and `~/.hermes/logs/project-activity.err.log`.
+
+Remove the LaunchAgent:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.twinmind.brief-project-activity"
+rm "$HOME/Library/LaunchAgents/com.twinmind.brief-project-activity.plist"
+```

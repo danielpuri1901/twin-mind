@@ -10,9 +10,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from shared.novelty import filter_novel_with_vectors, record as record_seen
+
 SNAPSHOT = "~/twin-corpus/notes/project-activity.json"
 HANDLED_STORE = "~/.hermes/state/seen-technical-events.jsonl"
 NOVELTY_STORE = "~/.hermes/state/seen-technical.jsonl"
+LEGACY_NOVELTY_STORE = "~/.hermes/state/technical-covered.txt"
 SCHEMA_VERSION = 1
 
 CODE_SUFFIXES = {
@@ -45,6 +48,66 @@ class ActivityCluster:
     paths: tuple[str, ...]
     score: int
     candidate_text: str
+
+
+def _legacy_topics(path: Path) -> list[str]:
+    topics = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        _, separator, topic = line.partition(": ")
+        topics.append((topic if separator else line).strip())
+    return [topic for topic in topics if topic]
+
+
+def _valid_semantic_store(path: Path) -> bool:
+    try:
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return bool(rows) and all(
+            isinstance(row.get("text"), str) and row["text"].strip() and row.get("vec")
+            for row in rows
+        )
+    except Exception:
+        return False
+
+
+def ensure_technical_history(
+    legacy_path: str = LEGACY_NOVELTY_STORE,
+    novelty_path: str = NOVELTY_STORE,
+) -> bool:
+    """Atomically seed semantic history from the old topic log once."""
+    legacy = Path(os.path.expanduser(legacy_path))
+    destination = Path(os.path.expanduser(novelty_path))
+    if destination.exists() and destination.stat().st_size:
+        return _valid_semantic_store(destination)
+    try:
+        if not legacy.exists():
+            return True
+        topics = _legacy_topics(legacy)
+        if not topics:
+            return True
+        temporary = destination.with_name(f"{destination.name}.{os.getpid()}.tmp")
+        temporary.unlink(missing_ok=True)
+        checked = filter_novel_with_vectors(topics, store=str(temporary), fail_open=False)
+        if len(checked) != len(topics) or any(vector is None for _, vector in checked):
+            return False
+        record_seen(
+            topics,
+            store=str(temporary),
+            vectors=[vector for _, vector in checked],
+            fail_silently=False,
+        )
+        if not _valid_semantic_store(temporary):
+            return False
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(temporary, destination)
+        return True
+    except Exception:
+        return False
+    finally:
+        if "temporary" in locals():
+            temporary.unlink(missing_ok=True)
 
 
 def _valid_event(event: object) -> bool:
