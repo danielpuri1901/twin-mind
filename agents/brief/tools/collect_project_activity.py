@@ -267,7 +267,7 @@ def publish_snapshot(source: Path, remote_host: str, remote_path: str) -> None:
         [
             "rsync",
             "--delay-updates",
-            "--chmod=F600",
+            "--chmod=u=rw,go=",
             str(source),
             f"{remote_host}:{remote_path}",
         ],

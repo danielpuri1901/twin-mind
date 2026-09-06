@@ -219,6 +219,7 @@ class CollectorTests(unittest.TestCase):
 
             command = run.call_args.args[0]
             self.assertEqual(command[0], "rsync")
+            self.assertIn("--chmod=u=rw,go=", command)
             self.assertEqual(command[-1], "twin-mind:/home/ec2-user/twin-corpus/notes/project-activity.json")
             self.assertTrue(run.call_args.kwargs["check"])
 
