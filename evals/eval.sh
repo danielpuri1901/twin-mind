@@ -7,6 +7,12 @@ cd "$(dirname "$0")/.."
 PY="$HOME/.hermes/hermes-agent/venv/bin/python"
 echo "== tool regression tests (deterministic, free) =="
 python3 evals/test_tools.py
+echo "== project activity collector (deterministic, free) =="
+python3 evals/test_project_activity_collector.py
+echo "== project activity ranking and novelty (deterministic, free) =="
+python3 evals/test_project_activity.py
+echo "== project-bound brief composition (deterministic, free) =="
+python3 evals/test_compose_brief.py
 echo "== background-prep calendar physics (deterministic, free) =="
 python3 evals/test_prep_scan.py
 echo "== brief watchdog matches the brief format (anti-drift, free) =="

@@ -9,16 +9,14 @@ abbreviated month while the brief renders unnumbered headers + full names), so i
 cried wolf every morning. Fixed to match reality, and the pure format checks are
 now `format_fails()` - tested by evals/test_brief_check.py against a known-good
 brief so the watchdog and the brief can never silently drift apart again.
-Checks: brief arrived, subject+date, six sections, weather, dividers, coverage,
-no em dash, quiz answer, calendar payload cross-check, heartbeat, skill-guard."""
+Checks: brief arrived, subject+date, required sections, weather, dividers, coverage,
+no em dash, optional quiz answer, calendar payload cross-check, heartbeat, skill-guard."""
 import email, imaplib, os, re, subprocess, sys
 from datetime import datetime, timedelta, timezone
 from email.header import decode_header, make_header
 
-# section NAMES (not "1. NAME") - the brief renders them unnumbered between dividers.
-# v3 (2026-07-14) is FIVE sections - Open Loops was dropped.
-SECTIONS = ["NEEDS YOU TODAY", "TODAY", "AI ADVANCEMENTS",
-            "ONE TECHNICAL THING", "COACH"]
+# The technical section is optional when no fresh project lesson survives its novelty gate.
+REQUIRED_SECTIONS = ["NEEDS YOU TODAY", "TODAY", "AI ADVANCEMENTS", "COACH"]
 
 
 def format_fails(subj, body, today):
@@ -38,8 +36,8 @@ def format_fails(subj, body, today):
                and (today.strftime("%A") in subj or today.strftime("%a") in subj))
     if not ok_date:
         fails.append(f"subject date wrong: '{subj}', expected {today.strftime('%A %-d %B')}")
-    # all six sections present as header lines (with or without a leading number)
-    missing = [s for s in SECTIONS
+    # required sections present as header lines (with or without a leading number)
+    missing = [s for s in REQUIRED_SECTIONS
                if not re.search(rf"^(\d+\.\s*)?{re.escape(s)}\s*$", body, re.M)]
     if missing:
         fails.append(f"missing sections: {', '.join(missing)}")

@@ -77,8 +77,7 @@ class ProjectActivityTests(unittest.TestCase):
                 event("docs", "notes", 4000, "docs: update readme", ["README.md"]),
                 event("deps", "demo", 5000, "chore: dependency bump", ["requirements.txt"]),
             ])
-            with mock.patch.object(activity, "filter_novel", side_effect=lambda texts, **kwargs: texts):
-                rows = activity.shortlist(str(snapshot), str(root / "handled.jsonl"), str(root / "seen.jsonl"))
+            rows = activity.shortlist(str(snapshot), str(root / "handled.jsonl"))
 
             self.assertEqual([row.project for row in rows], ["agentlab"])
 
@@ -92,8 +91,7 @@ class ProjectActivityTests(unittest.TestCase):
             cluster = activity.cluster_events([source])[0]
             activity.record_handled(cluster, "delivered", str(handled))
 
-            with mock.patch.object(activity, "filter_novel", side_effect=lambda texts, **kwargs: texts):
-                rows = activity.shortlist(str(snapshot), str(handled), str(root / "seen.jsonl"))
+            rows = activity.shortlist(str(snapshot), str(handled))
 
             self.assertEqual(rows, [])
 
@@ -105,8 +103,8 @@ class ProjectActivityTests(unittest.TestCase):
             write_snapshot(stale, [event("a", "agentlab", 1000, "feat: worker", ["worker.py"])], generated_at=1)
             invalid.write_text('{"schema_version": 99}')
 
-            self.assertEqual(activity.shortlist(str(stale), "missing", "missing"), [])
-            self.assertEqual(activity.shortlist(str(invalid), "missing", "missing"), [])
+            self.assertEqual(activity.shortlist(str(stale), "missing"), [])
+            self.assertEqual(activity.shortlist(str(invalid), "missing"), [])
 
     def test_technical_novelty_fails_closed_but_ai_default_stays_open(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -125,6 +123,21 @@ class ProjectActivityTests(unittest.TestCase):
 
             self.assertEqual(novelty.filter_novel(["candidate"], store=str(missing), fail_open=False), ["candidate"])
             self.assertEqual(novelty.filter_novel(["candidate"], store=str(broken), fail_open=False), [])
+
+    def test_novel_vector_is_reused_when_recording(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store = Path(raw) / "seen.jsonl"
+            store.write_text(json.dumps({"text": "old", "vec": [1.0, 0.0]}) + "\n")
+            with mock.patch.object(novelty, "_embed", return_value=[[0.0, 1.0]]) as embed:
+                checked = novelty.filter_novel_with_vectors(["new"], store=str(store), fail_open=False)
+
+            self.assertEqual(checked, [("new", [0.0, 1.0])])
+            embed.assert_called_once_with(["new"])
+            with mock.patch.object(novelty, "_embed") as second_embed:
+                novelty.record(["new"], store=str(store), vectors=[[0.0, 1.0]], fail_silently=False)
+
+            second_embed.assert_not_called()
+            self.assertEqual(json.loads(store.read_text().splitlines()[-1])["vec"], [0.0, 1.0])
 
 
 if __name__ == "__main__":

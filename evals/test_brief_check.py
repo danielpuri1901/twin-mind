@@ -19,6 +19,13 @@ GOOD = "\n".join([
     D, "COACH", D, "- You shipped the weather fix today - keep the momentum", "",
     "Reviewed 20 messages since 2026-07-14 07:30",
 ])
+GOOD_NO_TECHNICAL = "\n".join([
+    D, "NEEDS YOU TODAY", D, "- AWS budget alert (costalerts, 2026-07-14): review", "",
+    D, "TODAY", D, "Weather: Luxembourg: 16-28°C, rain chance 10%", "- 15:00 Sam call", "",
+    D, "AI ADVANCEMENTS", D, "- MoE routing: sparse experts cut compute", "",
+    D, "COACH", D, "- You shipped the weather fix today - keep the momentum", "",
+    "Reviewed 20 messages since 2026-07-14 07:30",
+])
 
 FAILS = []
 
@@ -31,6 +38,8 @@ def check(name, cond):
 # 1. the real brief format passes clean (the drift bug)
 gf = format_fails(SUBJECT, GOOD, TODAY)
 check(f"good brief passes clean (got {gf})", gf == [])
+gf = format_fails(SUBJECT, GOOD_NO_TECHNICAL, TODAY)
+check(f"good quiet brief passes without technical section (got {gf})", gf == [])
 
 # 2. real defects are still caught
 check("missing section caught",

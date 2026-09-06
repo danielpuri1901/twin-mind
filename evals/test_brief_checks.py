@@ -6,7 +6,6 @@ Runnable two ways: `python3 -m pytest evals/test_brief_checks.py -v`, or plain
 """
 import os
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import brief_checks as BC
@@ -17,8 +16,8 @@ def _good_brief():
         "needs_you_today": [{"who": "Palantir", "what": "branch deletion", "why_now": "today"}],
         "ai_advancements": ["inference compute is a capability dial", "long context is not retrieval"],
         "technical_thing": {
+            "source_id": "cluster-1", "project": "agentlab",
             "topic": "forced tool use", "concept": "force the shape, do not ask for it",
-            "code_path": "shared/structured.py:30", "code_symbol": "structured_call",
             "quiz": "why force?", "answer": "so it cannot reply in prose",
         },
         "coach": "name the owner and the alarm in the same commit",
@@ -44,13 +43,23 @@ def test_sections_present_fail_empty_coach():
 
 
 def test_sections_present_fail_missing_technical_field():
-    b = _good_brief(); b["technical_thing"]["code_symbol"] = ""
+    b = _good_brief(); b["technical_thing"]["source_id"] = ""
     r = BC.sections_present(b)
-    assert not r.passed and "code_symbol" in r.detail
+    assert not r.passed and "source_id" in r.detail
+
+
+def test_sections_present_allows_no_fresh_technical_item():
+    b = _good_brief(); b["technical_thing"] = None
+    assert BC.sections_present(b).passed
 
 
 def test_format_ok_pass():
     assert BC.format_ok(_rendered()).passed
+
+
+def test_format_ok_pass_without_optional_technical_section():
+    headers = [h for h in BC.SECTION_HEADERS if h != "ONE TECHNICAL THING"]
+    assert BC.format_ok(_rendered(headers)).passed
 
 
 def test_format_ok_today_not_matched_inside_needs_you_today():
@@ -77,15 +86,6 @@ def test_date_matches_fail():
     assert not r.passed
 
 
-def test_topic_fresh_pass():
-    assert BC.technical_topic_fresh(_good_brief(), "2026-07-23: one-shot agents").passed
-
-
-def test_topic_fresh_fail_case_and_space_insensitive():
-    r = BC.technical_topic_fresh(_good_brief(), "2026-07-20:  Forced   Tool  Use ")
-    assert not r.passed
-
-
 def test_no_em_dash_pass():
     assert BC.no_em_dash(_good_brief()).passed
 
@@ -93,24 +93,6 @@ def test_no_em_dash_pass():
 def test_no_em_dash_fail():
     b = _good_brief(); b["coach"] = "do the thing — now"
     assert not BC.no_em_dash(b).passed
-
-
-def test_code_symbol_real_pass_and_fail():
-    with tempfile.TemporaryDirectory() as d:
-        os.makedirs(os.path.join(d, "shared"))
-        with open(os.path.join(d, "shared", "structured.py"), "w") as f:
-            f.write("import boto3\n\ndef structured_call(model_id, system, user, schema):\n    pass\n")
-        # named symbol IS defined (path carries a line suffix) -> pass
-        assert BC.code_symbol_real(_good_brief(), d).passed
-        # symbol not defined in the file -> fail
-        b = _good_brief(); b["technical_thing"]["code_symbol"] = "totally_made_up_function"
-        assert not BC.code_symbol_real(b, d).passed
-
-
-def test_code_symbol_real_fail_missing_file():
-    with tempfile.TemporaryDirectory() as d:
-        r = BC.code_symbol_real(_good_brief(), d)
-        assert not r.passed and "not found" in r.detail
 
 
 if __name__ == "__main__":

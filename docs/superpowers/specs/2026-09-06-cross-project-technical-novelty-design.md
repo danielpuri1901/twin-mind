@@ -40,8 +40,7 @@ If the Mac is unavailable, EC2 uses the last valid snapshot and its unsurfaced e
 EC2 rejects snapshots with an unsupported schema or invalid records.
 It removes stale events, exact event IDs already handled, and events without useful code or configuration paths.
 It builds a compact candidate string from the project name, commit subject, and changed paths.
-It runs those strings through `shared.novelty.filter_novel` with a dedicated `~/.hermes/state/seen-technical.jsonl` store.
-An embedding or store failure fails closed for the technical section, because repeating a lesson is worse than omitting one.
+Exact event IDs prevent a delivered source change from returning to the shortlist.
 
 Code groups related commits into work sessions before ranking them.
 Commits belong to one cluster when they are in the same repository, occur within six hours, and touch overlapping paths.
@@ -59,8 +58,10 @@ The structured output carries the selected cluster ID and project slug.
 Code validates both against the shortlist, so the model cannot invent or select a hidden source.
 This judgment happens inside the existing composition call and does not add another model request.
 
-The technical concept and candidate text are checked semantically after composition.
+The final technical concept is checked semantically after composition against a dedicated `~/.hermes/state/seen-technical.jsonl` store.
 If the result is too similar to a previously delivered concept, the renderer omits the technical section and marks the source event as rejected.
+An embedding or store failure fails closed for the technical section, because repeating a lesson is worse than omitting one.
+The successful check returns the new vector, which delivery records without another embedding call.
 This does not trigger another model call.
 If no fresh candidate exists, the brief omits the section instead of forcing an old queue item.
 

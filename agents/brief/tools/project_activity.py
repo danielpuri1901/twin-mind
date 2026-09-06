@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from shared.novelty import filter_novel
-
 SNAPSHOT = "~/twin-corpus/notes/project-activity.json"
 HANDLED_STORE = "~/.hermes/state/seen-technical-events.jsonl"
 NOVELTY_STORE = "~/.hermes/state/seen-technical.jsonl"
@@ -205,10 +203,9 @@ def _handled_event_ids(path: str) -> set[str]:
 def shortlist(
     path: str = SNAPSHOT,
     handled_path: str = HANDLED_STORE,
-    novelty_store: str = NOVELTY_STORE,
     limit: int = 5,
 ) -> list[ActivityCluster]:
-    """Return a deterministic, semantically novel shortlist for model judgment."""
+    """Return meaningful unhandled work sessions for model judgment."""
     try:
         events = load_snapshot(path)
         handled = _handled_event_ids(handled_path)
@@ -218,15 +215,7 @@ def shortlist(
             and not _is_noise(cluster.subjects, cluster.paths)
         ]
         clusters.sort(key=lambda cluster: (-cluster.score, -cluster.latest_time, cluster.project.lower(), cluster.cluster_id))
-        texts = [cluster.candidate_text for cluster in clusters]
-        novel_texts = filter_novel(texts, store=novelty_store, fail_open=False)
-        remaining = list(novel_texts)
-        novel = []
-        for cluster in clusters:
-            if cluster.candidate_text in remaining:
-                novel.append(cluster)
-                remaining.remove(cluster.candidate_text)
-        return novel[:limit]
+        return clusters[:limit]
     except Exception:
         return []
 

@@ -82,7 +82,24 @@ def filter_novel(candidates, store=AI_STORE, threshold=0.80, fail_open=True):
         return candidates if fail_open else []
 
 
-def record(items, store=AI_STORE):
+def filter_novel_with_vectors(candidates, store=AI_STORE, threshold=0.80, fail_open=True):
+    """Return novel `(text, vector)` pairs so a caller can record without embedding twice."""
+    candidates = [candidate for candidate in candidates if candidate and candidate.strip()]
+    if not candidates:
+        return []
+    try:
+        seen = [row["vec"] for row in _load(store, fail_open=fail_open) if row.get("vec")]
+        vectors = _embed(candidates)
+        return [
+            (candidate, vector)
+            for candidate, vector in zip(candidates, vectors)
+            if max((_cos(vector, old) for old in seen), default=0.0) < threshold
+        ]
+    except Exception:
+        return [(candidate, None) for candidate in candidates] if fail_open else []
+
+
+def record(items, store=AI_STORE, vectors=None, fail_silently=True):
     """Append the items the brief actually surfaced (strings) to the store, with embeddings.
     Call this AFTER composing - it records what was shown, so future runs dedup against it."""
     items = [i for i in items if i and i.strip()]
@@ -91,13 +108,19 @@ def record(items, store=AI_STORE):
     path = os.path.expanduser(store)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        try:
-            vecs = _embed(items)
-        except Exception:
-            vecs = [None] * len(items)   # still log the text; just not dedup-able
+        if vectors is not None:
+            if len(vectors) != len(items):
+                raise ValueError("novelty item/vector count mismatch")
+            vecs = vectors
+        else:
+            try:
+                vecs = _embed(items)
+            except Exception:
+                vecs = [None] * len(items)   # still log the text; just not dedup-able
         day = datetime.now().strftime("%Y-%m-%d")
-        with open(path, "a") as f:
+        with open(path, "a", encoding="utf-8") as f:
             for text, vec in zip(items, vecs):
                 f.write(json.dumps({"date": day, "text": text[:400], "vec": vec}) + "\n")
     except Exception:
-        pass
+        if not fail_silently:
+            raise

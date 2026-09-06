@@ -172,9 +172,10 @@ git commit -m "feat: collect cross-project Git activity"
 - Produces: `ActivityCluster` with `cluster_id`, `project`, `event_ids`, `latest_time`, `subjects`, `paths`, `score`, and `candidate_text`.
 - Produces: `load_snapshot(path: str, now: datetime, max_age_days: int = 30) -> list[dict]`
 - Produces: `cluster_events(events: list[dict], window_hours: int = 6) -> list[ActivityCluster]`
-- Produces: `shortlist(path: str, handled_path: str, novelty_store: str, limit: int = 5) -> list[ActivityCluster]`
+- Produces: `shortlist(path: str, handled_path: str, limit: int = 5) -> list[ActivityCluster]`
 - Produces: `record_handled(cluster: ActivityCluster, status: str, path: str) -> None`
 - Extends: `filter_novel(candidates, store=AI_STORE, threshold=0.80, fail_open=True) -> list[str]`
+- Produces: `filter_novel_with_vectors(candidates, store=AI_STORE, threshold=0.80, fail_open=True) -> list[tuple[str, list[float]]]`
 
 - [ ] **Step 1: Write failing clustering and novelty tests**
 
@@ -192,9 +193,8 @@ class ProjectActivityTests(unittest.TestCase):
 
     def test_shortlist_prefers_technical_work_over_docs_and_dependencies(self):
         with tempfile.TemporaryDirectory() as raw:
-            snapshot, handled, seen = snapshot_with_feature_docs_and_bump(Path(raw))
-            with mock.patch.object(activity, "filter_novel", side_effect=lambda texts, **kwargs: texts):
-                rows = activity.shortlist(str(snapshot), str(handled), str(seen))
+            snapshot, handled, _seen = snapshot_with_feature_docs_and_bump(Path(raw))
+            rows = activity.shortlist(str(snapshot), str(handled))
 
             self.assertEqual(rows[0].project, "agentlab")
             self.assertTrue(all("dependency bump" not in row.candidate_text for row in rows))
@@ -222,6 +222,8 @@ Return an empty list on error when `fail_open` is false.
 Treat a missing store as a valid empty history.
 Treat malformed rows or stored rows without vectors as an error in fail-closed mode.
 Keep every existing caller unchanged so AI news remains fail-open.
+Add `filter_novel_with_vectors()` so the technical section can reuse the checked vector when recording.
+Add an optional `vectors` argument to `record()` so supplied vectors avoid another embedding request.
 
 - [ ] **Step 4: Implement snapshot validation and exact consumption state**
 
@@ -243,7 +245,8 @@ Award evidence for production source paths, tests, infrastructure, and subjects 
 Penalize documentation-only, formatting-only, generated-only, dependency-only, and merge activity.
 Use the score only to reduce the set to five clusters.
 Sort equal scores by latest activity descending, project slug, and cluster ID.
-Run each cluster's candidate text through `filter_novel(..., fail_open=False)` before returning the shortlist.
+Return the top five unhandled clusters without an embedding request.
+The exact event store removes reused source changes before composition.
 
 - [ ] **Step 7: Run the selection and existing novelty tests**
 
@@ -321,8 +324,9 @@ Tell it to return null when the shortlist is empty.
 - [ ] **Step 4: Validate source selection and post-compose novelty**
 
 Check that `source_id` and `project` exactly match one shortlisted cluster.
-Check `topic + concept` with the dedicated technical novelty store and `fail_open=False`.
+Check `topic + concept` with `filter_novel_with_vectors()` against the dedicated technical novelty store and `fail_open=False`.
 If either check fails, replace `brief.technical_thing` with null and retain the rejected cluster for handled-state recording after delivery.
+Reuse the returned vector when recording a delivered concept.
 Do not retry composition.
 
 - [ ] **Step 5: Render the optional section and correct delivery state**
