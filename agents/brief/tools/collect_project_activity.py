@@ -18,6 +18,7 @@ DEFAULT_OUTPUT = Path("~/twin-corpus/notes/project-activity.json").expanduser()
 DEFAULT_REMOTE_HOST = "twin-mind"
 DEFAULT_REMOTE_PATH = "/home/ec2-user/twin-corpus/notes/project-activity.json"
 MAX_COMMITS_PER_REPO = 20
+PROTECTED_PROJECT_ROOTS = ("Desktop", "Documents", "Downloads")
 
 EXCLUDED_DIRS = {
     "Library", ".Trash", ".cache", ".local", ".nvm", ".gemini",
@@ -82,6 +83,21 @@ def discover_repositories(home: Path) -> list[Path]:
             if ".git" in dirs:
                 dirs.remove(".git")
     return sorted(repositories)
+
+
+def require_scan_access(home: Path) -> None:
+    """Refuse a partial snapshot when launchd lacks macOS folder access."""
+    for name in PROTECTED_PROJECT_ROOTS:
+        folder = home / name
+        if not folder.exists():
+            continue
+        try:
+            with os.scandir(folder) as entries:
+                next(entries, None)
+        except PermissionError as error:
+            raise PermissionError(
+                f"Cannot scan {folder}. Grant Full Disk Access to /usr/bin/python3."
+            ) from error
 
 
 def _allowed_path(raw_path: str) -> bool:
@@ -212,6 +228,7 @@ def _dirty_event(repo: Path, home: Path, cutoff: datetime, now: datetime) -> Opt
 
 def collect_snapshot(home: Path, now: datetime, lookback_days: int = 14) -> dict:
     """Return a bounded, source-free activity snapshot for all discovered projects."""
+    require_scan_access(home)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     cutoff = now - timedelta(days=lookback_days)

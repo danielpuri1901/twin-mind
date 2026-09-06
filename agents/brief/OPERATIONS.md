@@ -64,6 +64,8 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.twinmind.brie
 
 The job runs at login and at 07:00 local time before the 07:30 brief.
 Its logs are `~/.hermes/logs/project-activity.out.log` and `~/.hermes/logs/project-activity.err.log`.
+macOS must grant Full Disk Access to `/usr/bin/python3` so the background job can scan projects under Desktop, Documents, and Downloads.
+Without that access, collection exits before writing or publishing, so the last complete remote snapshot stays intact.
 
 Remove the LaunchAgent:
 

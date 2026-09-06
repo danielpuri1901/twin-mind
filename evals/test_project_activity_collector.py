@@ -44,6 +44,15 @@ def commit_files(repo: Path, subject: str, files: dict[str, str]) -> str:
 
 
 class CollectorTests(unittest.TestCase):
+    def test_protected_folder_denial_aborts_collection(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            (home / "Desktop").mkdir()
+
+            with mock.patch.object(collector.os, "scandir", side_effect=PermissionError("denied")):
+                with self.assertRaisesRegex(PermissionError, "Full Disk Access"):
+                    collector.collect_snapshot(home, datetime.now(timezone.utc))
+
     def test_snapshot_includes_changed_names_without_file_contents(self):
         with tempfile.TemporaryDirectory() as raw:
             home = Path(raw)
