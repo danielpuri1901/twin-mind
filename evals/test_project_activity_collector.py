@@ -112,6 +112,11 @@ class CollectorTests(unittest.TestCase):
             feature = next(event for event in snapshot["events"] if event["event_id"] == feature_id)
             self.assertEqual(feature["project"], "project")
             self.assertEqual(feature["paths"], ["feature.py"])
+            self.assertFalse(any(
+                path.startswith(".worktrees/")
+                for event in snapshot["events"]
+                for path in event["paths"]
+            ))
             event_ids = [event["event_id"] for event in snapshot["events"]]
             self.assertEqual(len(event_ids), len(set(event_ids)))
 
@@ -166,8 +171,15 @@ class CollectorTests(unittest.TestCase):
             (repo / "coverage" / "report.json").write_text("secret")
             (repo / "secrets.py").write_text("secret")
             (repo / "token.txt").write_text("secret")
+            (repo / ".netrc").write_text("secret")
+            (repo / "service-account.json").write_text("secret")
+            (repo / "kubeconfig").write_text("secret")
+            (repo / "api_key.py").write_text("secret")
+            (repo / "private_key.py").write_text("secret")
             (repo / ".ssh").mkdir()
             (repo / ".ssh" / "id_rsa").write_text("secret")
+            for name in ("program.exe", "installer.dmg", "image.webp", "diagram.svg", "audio.mp3", "archive.7z"):
+                (repo / name).write_text("binary")
 
             encoded = json.dumps(collector.collect_snapshot(home, datetime.now(timezone.utc)))
 
@@ -180,6 +192,11 @@ class CollectorTests(unittest.TestCase):
             self.assertNotIn("secrets.py", encoded)
             self.assertNotIn("token.txt", encoded)
             self.assertNotIn("id_rsa", encoded)
+            for name in (
+                ".netrc", "service-account.json", "kubeconfig", "api_key.py", "private_key.py",
+                "program.exe", "installer.dmg", "image.webp", "diagram.svg", "audio.mp3", "archive.7z",
+            ):
+                self.assertNotIn(name, encoded)
 
     def test_write_snapshot_replaces_the_destination(self):
         with tempfile.TemporaryDirectory() as raw:

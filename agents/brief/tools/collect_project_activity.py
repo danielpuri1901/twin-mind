@@ -26,18 +26,33 @@ EXCLUDED_DIRS = {
     "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
     "vendor", "target", "coverage", ".next", ".turbo", ".terraform",
     ".output", ".ssh", ".aws", ".gnupg", "Pods", "DerivedData",
+    ".worktrees", "worktrees",
 }
 EXCLUDED_DIRS_LOWER = {directory.lower() for directory in EXCLUDED_DIRS}
 EXCLUDED_NAMES = {
     ".env", ".env.local", ".env.production", "credentials",
     "credentials.json", "secrets.json", ".npmrc", ".pypirc",
-    "id_rsa", "id_ed25519",
+    "id_rsa", "id_ed25519", ".netrc", "kubeconfig",
 }
 SENSITIVE_NAME_WORDS = {"secret", "secrets", "credential", "credentials", "token", "tokens"}
+SENSITIVE_NAME_FRAGMENTS = {"api_key", "private_key", "service_account"}
 EXCLUDED_SUFFIXES = {
     ".lock", ".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mov",
     ".zip", ".tar", ".gz", ".pdf", ".db", ".sqlite", ".sqlite3",
     ".pem", ".key", ".p12", ".pyc",
+}
+ALLOWED_SUFFIXES = {
+    ".c", ".cc", ".cfg", ".conf", ".cpp", ".cs", ".css", ".dart",
+    ".ex", ".exs", ".fs", ".fsx", ".go", ".gradle", ".graphql", ".h",
+    ".hpp", ".hrl", ".html", ".ini", ".ipynb", ".java", ".js", ".json",
+    ".jsx", ".kt", ".lua", ".md", ".php", ".plist", ".properties",
+    ".proto", ".py", ".r", ".rb", ".rs", ".rst", ".scala", ".scss",
+    ".sh", ".sql", ".svelte", ".swift", ".tf", ".toml", ".ts", ".tsx",
+    ".txt", ".vue", ".xml", ".yaml", ".yml",
+}
+ALLOWED_NAMES = {
+    ".dockerignore", ".editorconfig", ".gitignore", "cmakelists.txt",
+    "dockerfile", "gemfile", "justfile", "makefile", "procfile", "rakefile",
 }
 
 
@@ -59,7 +74,7 @@ def discover_repositories(home: Path) -> list[Path]:
     for root, dirs, files in os.walk(home):
         dirs[:] = sorted(
             directory for directory in dirs
-            if directory in {".git", ".worktrees"}
+            if directory in {".git", ".worktrees", "worktrees"}
             or (directory not in EXCLUDED_DIRS and not directory.startswith("."))
         )
         if ".git" in dirs or ".git" in files:
@@ -79,10 +94,16 @@ def _allowed_path(raw_path: str) -> bool:
     name = Path(path).name.lower()
     if name in EXCLUDED_NAMES or name.startswith(".env."):
         return False
-    name_words = set(name.replace("-", "_").replace(".", "_").split("_"))
+    normalized_name = name.replace("-", "_").replace(".", "_")
+    name_words = set(normalized_name.split("_"))
     if name_words & SENSITIVE_NAME_WORDS:
         return False
-    return Path(name).suffix.lower() not in EXCLUDED_SUFFIXES
+    if any(fragment in normalized_name for fragment in SENSITIVE_NAME_FRAGMENTS):
+        return False
+    suffix = Path(name).suffix.lower()
+    if suffix in EXCLUDED_SUFFIXES:
+        return False
+    return name in ALLOWED_NAMES or suffix in ALLOWED_SUFFIXES
 
 
 @lru_cache(maxsize=None)
