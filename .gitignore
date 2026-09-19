@@ -1,8 +1,33 @@
 # Secrets - never commit
 .env
 .env.*
+!.env.example
+.aws/
+credentials
+credentials.*
+secrets/
+.private/
+CLAUDE.private.md
+*.secret
 *.pem
 *.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# AWS plus infrastructure state
+infra/instance-id.txt
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+*.tfplan
+tfplan
 
 # Python
 __pycache__/
@@ -24,6 +49,12 @@ env/
 *.log
 outputs/
 .cache/
+raw/
+normalized/
+wiki/
+corpus.db*
+state.db*
+.hermes/
 
 # OS
 .DS_Store

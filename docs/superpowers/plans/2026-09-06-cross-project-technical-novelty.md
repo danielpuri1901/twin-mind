@@ -383,7 +383,7 @@ git commit -m "feat: teach from novel cross-project work"
 
 - [ ] **Step 1: Create the LaunchAgent definition**
 
-Use `/usr/bin/python3` and the canonical script path in `/Users/danielpuri/Super Project`.
+Use `/usr/bin/python3` and the canonical script path in `/Users/you/twin-mind`.
 Set `RunAtLoad` to true.
 Set a `StartCalendarInterval` for 07:00 local time.
 Set `HOME` and a PATH containing `/usr/bin`, `/bin`, `/usr/sbin`, `/sbin`, `/usr/local/bin`, and `/opt/homebrew/bin`.

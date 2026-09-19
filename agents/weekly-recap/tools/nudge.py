@@ -52,9 +52,11 @@ def week_headlines(days=7):
 
 def send_telegram(text):
     token = env("TELEGRAM_BOT_TOKEN")
-    chat = env("TELEGRAM_HOME_CHANNEL") or "6309668956"
+    chat = env("TELEGRAM_HOME_CHANNEL")
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN missing in ~/.hermes/.env")
+    if not chat:
+        raise RuntimeError("TELEGRAM_HOME_CHANNEL missing in ~/.hermes/.env")
     data = urllib.parse.urlencode({"chat_id": chat, "text": text}).encode()
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
     return json.load(urllib.request.urlopen(req, timeout=20))

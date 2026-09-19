@@ -8,7 +8,7 @@ import json, os, sys, tempfile
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "agents", "background-prep", "tools"))
-os.environ.setdefault("TWIN_SMTP_ADDRESS", "danielpuri1901@gmail.com")
+os.environ.setdefault("TWIN_SMTP_ADDRESS", "you@example.com")
 import scan_meetings as sm
 
 FAILS = []
@@ -27,7 +27,7 @@ def ics_event(uid, dtstart, attendees=(), desc="", status="", summary="Test"):
     return (f"BEGIN:VEVENT\nUID:{uid}\nDTSTART{dtstart}\nSUMMARY:{summary}\n{a}{s}{d}END:VEVENT\n")
 
 
-ME = "danielpuri1901@gmail.com"
+ME = "you@example.com"
 now = sm.local_now().replace(minute=0, second=0, microsecond=0)
 in1h_utc = (now + timedelta(hours=1)).astimezone(timezone.utc).strftime(":%Y%m%dT%H%M%SZ")
 in1h_tzid = ";TZID=Europe/Luxembourg" + (now + timedelta(hours=1)).strftime(":%Y%m%dT%H%M%S")
@@ -37,17 +37,17 @@ evs = sm.parse_events("BEGIN:VCALENDAR\n" + ics_event("z1", in1h_utc) + ics_even
 check("tz: Z and TZID same instant", abs((evs[0]["start"] - evs[1]["start"]).total_seconds()) < 1)
 
 # --- all-day excluded (VALUE=DATE) ---
-evs = sm.parse_events(ics_event("ad", ";VALUE=DATE:20260715", attendees=["x@corp.com"]))
+evs = sm.parse_events(ics_event("ad", ";VALUE=DATE:20260715", attendees=["attendee@example.com"]))
 check("all-day never qualifies", not sm.qualifies(evs[0], set()))
 
 # --- cancelled suppressed ---
-evs = sm.parse_events(ics_event("c1", in1h_utc, attendees=["x@corp.com"], status="CANCELLED"))
+evs = sm.parse_events(ics_event("c1", in1h_utc, attendees=["attendee@example.com"], status="CANCELLED"))
 check("cancelled never qualifies", not sm.qualifies(evs[0], set()))
 
 # --- scope filter: circle member alone = personal; outsider = qualifies; Daniel never counts ---
-circ = {"mom@family.com"}
-only_circle = sm.parse_events(ics_event("p1", in1h_utc, attendees=[ME, "mom@family.com"]))[0]
-outsider = sm.parse_events(ics_event("p2", in1h_utc, attendees=[ME, "recruiter@corp.com"]))[0]
+circ = {"family@example.com"}
+only_circle = sm.parse_events(ics_event("p1", in1h_utc, attendees=[ME, "family@example.com"]))[0]
+outsider = sm.parse_events(ics_event("p2", in1h_utc, attendees=[ME, "recruiter@example.com"]))[0]
 solo = sm.parse_events(ics_event("p3", in1h_utc, attendees=[ME]))[0]
 check("circle-only meeting is personal", not sm.qualifies(only_circle, circ))
 check("outside-circle attendee qualifies", sm.qualifies(outsider, circ))
@@ -58,8 +58,8 @@ link = sm.parse_events(ics_event("v1", in1h_utc, desc="join https://meet.google.
 check("video link qualifies", sm.qualifies(link, circ))
 
 # --- unfolding: folded ATTENDEE lines (RFC 5545 continuation) still parsed ---
-folded = "BEGIN:VEVENT\nUID:f1\nDTSTART" + in1h_utc + "\nATTENDEE;CN=Long Person Name With A Very\n Long Parameter:mailto:folded@corp.com\nEND:VEVENT\n"
-check("folded attendee parsed", sm.parse_events(folded)[0]["attendees"] == ["folded@corp.com"])
+folded = "BEGIN:VEVENT\nUID:f1\nDTSTART" + in1h_utc + "\nATTENDEE;CN=Long Person Name With A Very\n Long Parameter:mailto:folded@example.com\nEND:VEVENT\n"
+check("folded attendee parsed", sm.parse_events(folded)[0]["attendees"] == ["folded@example.com"])
 
 # --- due(): window, delivered idempotence, live lease, expired lease (the catch-up core) ---
 ev = {"uid": "d1", "start": now + timedelta(minutes=60)}
@@ -74,10 +74,10 @@ past = {"uid": "d3", "start": now - timedelta(minutes=30)}
 check("outside 75 min -> not due", not sm.due(far, {}, now))
 check("already started -> not due", not sm.due(past, {}, now))
 
-# --- 2026-07-14 scope-replay catches (real prod bugs found pre-prod, Growth Protocol) ---
+# --- scope-replay catches from real pre-production bugs ---
 # recruiter as ORGANIZER only, Daniel the sole attendee
 org_only = ("BEGIN:VEVENT\nUID:o1\nDTSTART" + in1h_utc + "\nSUMMARY:Interview\n"
-            "ORGANIZER;CN=r:mailto:recruiter@growthprotocol.ai\n"
+            "ORGANIZER;CN=r:mailto:recruiter@example.com\n"
             f"ATTENDEE;CN=d:mailto:{ME}\nEND:VEVENT\n")
 check("external organizer-only qualifies", sm.qualifies(sm.parse_events(org_only)[0], circ))
 # Meet link only in LOCATION / X-GOOGLE-CONFERENCE, DESCRIPTION is boilerplate HTML
@@ -90,7 +90,7 @@ check("link in LOCATION qualifies", sm.qualifies(sm.parse_events(loc_link)[0], c
 check("link in X-GOOGLE-CONFERENCE qualifies", sm.qualifies(sm.parse_events(conf_link)[0], circ))
 # Daniel as organizer of a circle-only event must NOT qualify (organizer rule excludes ME)
 own_org = ("BEGIN:VEVENT\nUID:o4\nDTSTART" + in1h_utc + "\nSUMMARY:Family\n"
-           f"ORGANIZER;CN=d:mailto:{ME}\nATTENDEE;CN=m:mailto:mom@family.com\nEND:VEVENT\n")
+           f"ORGANIZER;CN=d:mailto:{ME}\nATTENDEE;CN=m:mailto:family@example.com\nEND:VEVENT\n")
 check("own-organized circle event stays personal", not sm.qualifies(sm.parse_events(own_org)[0], circ))
 
 # --- dedupe: mirrored invites (same start + same link) = ONE meeting, one dossier ---
@@ -105,11 +105,11 @@ check("no-link events never deduped", len(sm.dedupe([sm.parse_events(ics_event('
                                                      sm.parse_events(ics_event('n2', in1h_utc))[0]])) == 2)
 
 # --- interview detection (2026-07-14: cold interviews need the CANDIDATE frame deterministically) ---
-check("title 'Interview' detected", sm.is_interview({"summary": "First Round Interview - Growth Protocol"}))
+check("title 'Interview' detected", sm.is_interview({"summary": "First Round Interview - Example Company"}))
 check("title 'Take-Home' detected", sm.is_interview({"summary": "Take-Home (LangGraph) + Review"}))
 check("peer interview detected", sm.is_interview({"summary": "Peer Interview - Daniel Puri"}))
 check("ATS organizer detected", sm.is_interview({"summary": "Chat", "organizer": "no-reply@greenhouse.io", "attendees": []}))
-check("plain catch-up NOT an interview", not sm.is_interview({"summary": "Daniel / Sam Catch-up", "attendees": ["sam@postral.org"]}))
+check("plain catch-up NOT an interview", not sm.is_interview({"summary": "Daniel / Sam Catch-up", "attendees": ["sam@example.com"]}))
 
 # --- recurring: two occurrences of one UID are independent preps (UID+start key) ---
 occ1 = {"uid": "r1", "start": now + timedelta(minutes=60)}

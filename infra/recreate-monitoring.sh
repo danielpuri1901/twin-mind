@@ -2,9 +2,10 @@
 # Monitoring as code (stepback 2026-07-14: the alarm existed only in AWS).
 # Idempotent: safe to rerun. Requires an authenticated admin session.
 set -e
+: "${ALERT_EMAIL:?Set ALERT_EMAIL to the monitoring recipient}"
 R=eu-west-1
 TOPIC=$(aws sns create-topic --name twin-mind-alerts --region $R --query TopicArn --output text)
-aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint danielpuri1901@gmail.com --region $R || true
+aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint "$ALERT_EMAIL" --region $R || true
 aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-brief-deadman \
   --alarm-description "Morning brief has not sent in 24h" \
   --namespace TwinMind --metric-name BriefSent --statistic Sum \

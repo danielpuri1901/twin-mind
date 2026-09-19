@@ -2,7 +2,7 @@
 name: morning-brief
 description: Daniel's daily 07:30 brief - act-fast decisions on top, bus-depth learning below, sent as one real email
 ---
-Compose Daniel's morning brief and SEND it as ONE real email to danielpuri1901@gmail.com
+Compose Daniel's morning brief and SEND it as ONE real email to you@example.com
 (send-only, pre-approved). v3 per the 2026-07-14 spec: the pre-fetch script already gathered
 ALL facts (weather, calendar, state-annotated inbox, covered topics) - they are in your prompt.
 Your only jobs: judge substance and write prose. Do NOT re-fetch what the script provided.

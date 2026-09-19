@@ -1,44 +1,121 @@
 # Twin Mind
 
-A personal AI that learns from my own data, drafts in my voice, acts across my tools, and coaches me toward my best self.
-I stay in the loop on everything it does.
+I am restrained by what I can remember at once.
+Twin Mind turns my private history into useful context for each day.
 
-Twin Mind only does the things a stateless chatbot cannot: it holds persistent memory of my life, it is proactive instead of purely reactive, and it works over my private data.
-Everything else it would do worse than a general chatbot, so it does not try to.
+## Explore the system
+
+[Open the agent coordination map](https://danielpuri1901.github.io/twin-mind/agent-coordination.html)
+
+The source lives at [`docs/agent-coordination.html`](docs/agent-coordination.html).
+It runs as one standalone page with no server setup.
 
 ## What it does
 
-- **Morning brief** - a daily email at 07:30. Deterministic pipeline: facts are gathered by code (calendar, inbox triage, weather, recent AI news, the latest changelog entry), then exactly one constrained LLM call composes the sections, then code renders and sends it. The format, date, and counts are code-guaranteed, so the only thing left to evaluate is content quality.
-- **Background prep** - a half-page dossier delivered before professional meetings, built from calendar plus the corpus.
-- **Interactive chat** - a Telegram twin grounded in my corpus through automatic retrieval on every non-trivial turn.
+- **Morning brief:** Produces one daily email from calendar events, inbox signals, weather, recent AI work, project activity.
+- **Background prep:** Creates a short dossier before professional meetings.
+- **Interactive chat:** Grounds Telegram replies in a private personal corpus.
+- **Weekly recap:** Collects build progress plus personal reflection into one review.
 
-## Architecture
+Twin Mind focuses on tasks that need persistent memory, proactive timing, private context.
+A general chatbot remains better for isolated questions.
 
-- **Agent runtime:** Hermes Agent (Nous Research, MIT). Provides memory, skills, cron, and MCP.
-- **Inference:** Claude via AWS Bedrock, tiered by task (Haiku for triage, Sonnet for drafting, Opus for hard reasoning). EU inference profiles keep personal-data processing in region.
-- **Corpus + retrieval:** one record is `{source, date, who, text}`. Hybrid retrieval (BM25 + Cohere multilingual embeddings in sqlite-vec) fused with reciprocal rank fusion. Contextual embedding adds a deterministic metadata prefix to each chunk before embedding. All corpus access goes through one contract, the `corpus-search` CLI.
-- **Observability + evals:** traces, datasets, and judge scores mirror to a hosted dashboard, while local files stay the source of truth.
-- **Host:** a small always-on AWS box, reached over SSM only, with zero inbound. Derived data ships point-to-point; raw data never leaves my machine.
+## How one request works
 
-## Principles
+```text
+Schedule / Telegram
+        |
+        v
+Hermes Agent
+        |
+        +--> skill selects task
+        +--> code gathers facts
+        +--> corpus-search retrieves context
+        +--> Bedrock generates constrained text
+        +--> deterministic checks validate output
+        +--> approved channel delivers result
+        |
+        v
+Langfuse traces + task-specific evals
+```
 
-- **Eval-first.** Build the scorecard before tuning anything. Nothing ships unless it beats the scorecard, enforced by a ship gate (`evals/eval.sh`) that must be green before deploy.
-- **Deterministic by default.** Compute every fact in code and inject it into the prompt. The model judges and writes; it never computes a date, count, or lookup. When the model must return structured data, its shape is enforced with structured outputs, never scraped from text.
-- **Human in the loop by reversibility.** Act autonomously on read, search, and draft. Require approval for send, spend, or anything hard to reverse.
-- **Evals measure the actual job.** Each agent is graded against its own golden set for its own job, with one judge per failure mode, calibrated against my own labels.
-- **One folder per agent.** Everything an agent is lives under `agents/<name>/`. Shared code is shared only when two or more agents use it.
+Code computes dates, counts, lookups, delivery rules.
+Models handle judgment plus writing.
+Structured model responses use schemas instead of text parsing.
 
-## Repo map
+## Memory
 
-| Path | What it holds |
-|---|---|
-| `agents/` | One folder per agent (brief, background-prep, chat): its skill, operations notes, and tools. |
-| `shared/` | Cross-agent code: the corpus-search contract, structured-output helper, the SOUL. |
-| `evals/` | The ship gate, calibrated judges, per-agent golden datasets, deterministic checks. |
-| `pipeline/` | Data-prep that runs on my machine: source normalizers, chunking, embedding. |
-| `infra/` | Box config, monitoring, and Hermes plugins (tracing, auto-retrieval). |
-| `docs/` | Design docs, architecture map, and the changelog. |
+Raw personal data stays encrypted on the local machine.
+Only a derived working set reaches the private AWS host through SSM.
+No corpus data belongs in Git, S3, logs, third-party datasets.
 
-## A note on data
+All corpus access uses one command:
 
-This is a personal project. Raw personal data stays encrypted on my own machine and is never committed here; only code and derived, non-sensitive artifacts live in this repo.
+```bash
+corpus-search "query" --k 20
+```
+
+The retrieval layer combines full-text search, multilingual embeddings, reciprocal-rank fusion.
+Recent material guides voice plus current behavior.
+Older material remains available as historical context.
+
+## Evaluation
+
+Each agent has its own job-specific dataset.
+Deterministic checks run first.
+Calibrated model judges cover subjective failures only.
+Human labels remain the reference point.
+
+Run free checks directly:
+
+```bash
+python3 evals/test_tools.py
+python3 evals/test_prep_scan.py
+python3 evals/test_brief_check.py
+python3 evals/test_granola_fetch.py
+```
+
+The full ship gate uses Bedrock, so it can create a small model charge:
+
+```bash
+evals/eval.sh
+```
+
+## Repository map
+
+| Path | Purpose |
+| --- | --- |
+| `agents/` | One folder per production agent. |
+| `shared/` | Corpus access, structured output, shared policy. |
+| `evals/` | Regression checks, judges, job-specific evaluation tools. |
+| `pipeline/` | Local data normalization, chunking, embedding. |
+| `infra/` | Private host templates, monitoring, runtime plugins. |
+| `docs/` | Design records, visual maps, technical decisions. |
+
+## Configuration
+
+Copy the safe environment example:
+
+```bash
+cp .env.example .env
+set -a
+source .env
+set +a
+```
+
+Fill the local file with your own values.
+Git ignores `.env`, private keys, AWS credentials, local state, personal corpus files.
+
+Copy the safe instance example only when a local script needs an EC2 target:
+
+```bash
+cp infra/instance-id.example.txt infra/instance-id.txt
+```
+
+Runtime secrets belong in a private environment file, AWS Systems Manager Parameter Store, the relevant managed secret store.
+See [`SECURITY.md`](SECURITY.md) before reporting a possible credential leak.
+
+## Status
+
+This is a personal research system.
+Its architecture changes when production feedback exposes a better design.

@@ -20,7 +20,7 @@ flowchart TB
         RAW --> PREP
     end
 
-    subgraph BOX["☁️ AWS box - i-0abed8b0182b8bc9e (eu-west-1, zero-inbound, SSM-only)"]
+    subgraph BOX["☁️ AWS box - i-0123456789abcdef0 (eu-west-1, zero-inbound, SSM-only)"]
         HERMES["Hermes Agent runtime<br/>memory · skills · cron · MCP"]
         DERIVED["derived corpus<br/>index/ (vectors.db + corpus.db)<br/>+ datasets + wiki"]
         AGENTS["agents: chat · brief · background-prep · weekly-recap"]
@@ -267,7 +267,7 @@ flowchart LR
 
 | Thing | Value |
 |---|---|
-| Box | EC2 `i-0abed8b0182b8bc9e`, t4g.small, eu-west-1, zero-inbound, SSM-only, role `twin-mind-role` |
+| Box | EC2 `i-0123456789abcdef0`, t4g.small, eu-west-1, zero-inbound, SSM-only, role `twin-mind-role` |
 | Agent framework | Hermes (Nous Research) - memory, skills, cron, MCP |
 | Inference | Bedrock: Claude EU profiles (Sonnet drafting / Haiku triage), Cohere embed-multilingual-v3, Amazon rerank (eu-central-1) |
 | Retrieval | Hybrid (FTS5 + sqlite-vec + RRF) via `corpus-search`; windowed + contextual chunks (promoted 2026-07-21) |

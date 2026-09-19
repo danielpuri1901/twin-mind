@@ -32,7 +32,7 @@
 ### Task 1: Project scaffold commit
 
 **Files:**
-- Modify: `/Users/danielpuri/Desktop/Super Project/` (repo already init'd; README, CLAUDE.md, docs/, tools/ exist)
+- Modify: `/Users/you/twin-mind/` (repo already init'd; README, CLAUDE.md, docs/, tools/ exist)
 
 **Interfaces:**
 - Produces: a clean baseline commit so every later task is a reviewable diff.
@@ -40,7 +40,7 @@
 - [ ] **Step 1: Commit the scaffold**
 
 ```bash
-cd "/Users/danielpuri/Desktop/Super Project"
+cd "/Users/you/twin-mind"
 git add -A
 git commit -m "chore: project scaffold - design doc, plans, ingestion tools, project rules"
 ```
@@ -110,11 +110,11 @@ aws budgets create-budget --account-id "$ACCOUNT" \
   --budget file://infra/budget.json \
   --notifications-with-subscribers '[
     {"Notification":{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":50,"ThresholdType":"PERCENTAGE"},
-     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"danielpuri1901@gmail.com"}]},
+     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"you@example.com"}]},
     {"Notification":{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":80,"ThresholdType":"PERCENTAGE"},
-     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"danielpuri1901@gmail.com"}]},
+     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"you@example.com"}]},
     {"Notification":{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":100,"ThresholdType":"PERCENTAGE"},
-     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"danielpuri1901@gmail.com"}]}]'
+     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"you@example.com"}]}]'
 ```
 
 - [ ] **Step 3: Verify**
@@ -454,7 +454,7 @@ Add to `~/.ssh/config`:
 
 ```
 Host twin-mind
-  ProxyCommand sh -c "aws ssm start-session --target $(cat '/Users/danielpuri/Desktop/Super Project/infra/instance-id.txt') --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
+  ProxyCommand sh -c "aws ssm start-session --target $(cat '/Users/you/twin-mind/infra/instance-id.txt') --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
   User ec2-user
 ```
 

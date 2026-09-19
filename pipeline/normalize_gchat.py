@@ -14,7 +14,7 @@ from datetime import datetime
 HOME = os.path.expanduser("~")
 SRC = os.path.join(HOME, "twin-corpus/raw/google/extracted/Takeout/Google Chat/Groups")
 OUT = os.path.join(HOME, "twin-corpus/normalized/gchat.jsonl")
-ME = "danielpuri1901@gmail.com"
+ME = "you@example.com"
 
 
 def parse_date(s):

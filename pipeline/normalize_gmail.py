@@ -20,7 +20,7 @@ from email.utils import parseaddr, parsedate_to_datetime
 
 SRC = os.path.expanduser("~/twin-corpus/raw/google/All mail Including Spam and Trash-002.mbox")
 OUT = os.path.expanduser("~/twin-corpus/normalized/gmail.jsonl")
-ME = "danielpuri1901@gmail.com"
+ME = "you@example.com"
 MAX_BODY = 4000
 
 QUOTE_MARKERS = re.compile(

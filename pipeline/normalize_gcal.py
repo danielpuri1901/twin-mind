@@ -9,7 +9,7 @@ import os
 import re
 
 SRC = os.path.expanduser(
-    "~/twin-corpus/raw/google/extracted/Takeout/Calendar/danielpuri1901@gmail.com.ics")
+    "~/twin-corpus/raw/google/extracted/Takeout/Calendar/you@example.com.ics")
 OUT = os.path.expanduser("~/twin-corpus/normalized/gcal.jsonl")
 
 

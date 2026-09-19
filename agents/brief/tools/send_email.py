@@ -22,7 +22,7 @@ if os.path.exists(ENV):
             k, _, v = line.strip().partition("=")
             os.environ.setdefault(k, v)
 
-ME = os.environ.get("TWIN_SMTP_ADDRESS", "danielpuri1901@gmail.com")
+ME = os.environ.get("TWIN_SMTP_ADDRESS", "you@example.com")
 
 
 def main():

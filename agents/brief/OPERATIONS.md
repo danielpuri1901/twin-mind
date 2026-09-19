@@ -42,7 +42,7 @@ It never publishes source contents, untracked contents, commit bodies, absolute 
 Run and publish manually:
 
 ```bash
-/usr/bin/python3 "/Users/danielpuri/Super Project/agents/brief/tools/collect_project_activity.py" --publish
+/usr/bin/python3 "/Users/you/twin-mind/agents/brief/tools/collect_project_activity.py" --publish
 ```
 
 The local snapshot is `~/twin-corpus/notes/project-activity.json`.
@@ -57,7 +57,7 @@ Install or refresh the LaunchAgent:
 
 ```bash
 mkdir -p "$HOME/.hermes/logs"
-cp "/Users/danielpuri/Super Project/agents/brief/com.twinmind.brief-project-activity.plist" "$HOME/Library/LaunchAgents/"
+cp "/Users/you/twin-mind/agents/brief/com.twinmind.brief-project-activity.plist" "$HOME/Library/LaunchAgents/"
 launchctl bootout "gui/$(id -u)/com.twinmind.brief-project-activity" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.twinmind.brief-project-activity.plist"
 ```

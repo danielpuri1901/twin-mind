@@ -8,19 +8,19 @@
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
-    <string>/Users/danielpuri/Super Project/agents/brief/tools/collect_project_activity.py</string>
+    <string>/Users/you/twin-mind/agents/brief/tools/collect_project_activity.py</string>
     <string>--publish</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/danielpuri/Super Project</string>
+  <string>/Users/you/twin-mind</string>
 
   <key>EnvironmentVariables</key>
   <dict>
     <key>HOME</key>
-    <string>/Users/danielpuri</string>
+    <string>/Users/you</string>
     <key>PATH</key>
-    <string>/Users/danielpuri/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin</string>
+    <string>/Users/you/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin</string>
   </dict>
 
   <key>RunAtLoad</key>
@@ -38,9 +38,9 @@
   <string>Background</string>
 
   <key>StandardOutPath</key>
-  <string>/Users/danielpuri/.hermes/logs/project-activity.out.log</string>
+  <string>/Users/you/.hermes/logs/project-activity.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/danielpuri/.hermes/logs/project-activity.err.log</string>
+  <string>/Users/you/.hermes/logs/project-activity.err.log</string>
 </dict>
 </plist>
