@@ -57,13 +57,32 @@ _primed: set = set()
 
 
 def _export(session_id: str):
-    """The finished session as message dicts, via the supported CLI contract."""
+    """The finished session's messages, via the supported CLI contract.
+
+    `hermes sessions export` writes ONE object per SESSION, with the turns
+    nested under `messages`, so the lines have to be flattened. Measured, not
+    assumed: the first version of this read the session rows as if they were
+    messages and normalized 31 turns down to zero records.
+    """
     try:
         proc = subprocess.run(
             ["hermes", "sessions", "export", "--session-id", session_id, "-"],
             capture_output=True, text=True, timeout=60, env=os.environ,
         )
-        return [json.loads(ln) for ln in proc.stdout.splitlines() if ln.strip().startswith("{")]
+        messages = []
+        for line in proc.stdout.splitlines():
+            if not line.strip().startswith("{"):
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            nested = obj.get("messages")
+            if isinstance(nested, list):
+                messages.extend(m for m in nested if isinstance(m, dict))
+            elif obj.get("role"):
+                messages.append(obj)  # already a message
+        return messages
     except Exception as exc:  # fail-open
         logger.warning("twin-episodic export failed for %s: %s", session_id, exc)
         return []
