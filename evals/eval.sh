@@ -17,8 +17,10 @@ echo "== background-prep calendar physics (deterministic, free) =="
 python3 evals/test_prep_scan.py
 echo "== brief watchdog matches the brief format (anti-drift, free) =="
 python3 evals/test_brief_check.py
-echo "== granola transcript ingest (deterministic, free) =="
-python3 evals/test_granola_fetch.py
+echo "== wispr flow meeting ingest (deterministic, free) =="
+python3 evals/test_wispr_ingest.py
+echo "== weekly recap reads meetings from the corpus (deterministic, free) =="
+python3 evals/test_recap_meetings.py
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" evals/run_regression.py --trials 3
 if [ "$1" = "--full" ]; then

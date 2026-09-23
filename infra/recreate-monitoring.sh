@@ -21,4 +21,14 @@ aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-prep-poller-d
   --namespace TwinMind --metric-name PrepPollerRan --statistic Sum \
   --period 10800 --evaluation-periods 1 --threshold 1 \
   --comparison-operator LessThanThreshold --treat-missing-data breaching --alarm-actions "$TOPIC"
-echo "monitoring recreated: 3 metrics, 3 dead-man alarms, 1 topic"
+aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-meeting-ingest-deadman \
+  --alarm-description "Wispr Flow meeting ingester stopped heartbeating (12h) - runs every 4h on the box" \
+  --namespace TwinMind --metric-name MeetingIngestRan --statistic Sum \
+  --period 21600 --evaluation-periods 2 --threshold 1 \
+  --comparison-operator LessThanThreshold --treat-missing-data breaching --alarm-actions "$TOPIC"
+aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-meeting-freshness \
+  --alarm-description "No new Wispr Flow meeting reached the corpus in 7 days - the ingester may run but bring nothing (the Granola failure mode). Missing data is not breaching: the meeting-ingest-deadman alarm covers a stopped job." \
+  --namespace TwinMind --metric-name MeetingsIngested --statistic Sum \
+  --period 86400 --evaluation-periods 7 --datapoints-to-alarm 7 --threshold 1 \
+  --comparison-operator LessThanThreshold --treat-missing-data notBreaching --alarm-actions "$TOPIC"
+echo "monitoring recreated: 5 metrics, 4 dead-man alarms + 1 freshness alarm, 1 topic"

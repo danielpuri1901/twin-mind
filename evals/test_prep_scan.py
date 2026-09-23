@@ -116,7 +116,36 @@ occ1 = {"uid": "r1", "start": now + timedelta(minutes=60)}
 occ2 = {"uid": "r1", "start": now + timedelta(days=7, minutes=60)}
 check("recurring occurrences keyed apart", sm.key_of(occ1) != sm.key_of(occ2))
 
+# --- Telegram noise (2026-09-23): the poller's stdout IS a Telegram message (no-agent job).
+# Only the dossier and real failures may reach Daniel. The old 21:00 goal question and the
+# "prep scheduled" status line read as a second, early prep. ---
+import contextlib, io, types
+_tmp = tempfile.mkdtemp()
+sm.STATE = os.path.join(_tmp, "prep-state.json")
+_real_run, _real_hb, _real_urlopen = sm.subprocess.run, sm.heartbeat, sm.urllib.request.urlopen
+sm.subprocess.run = lambda *a, **k: types.SimpleNamespace(returncode=0, stdout="", stderr="")
+sm.heartbeat = lambda: None
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    sm.schedule_prep({"uid": "q1", "summary": "Interview with X", "start": now + timedelta(minutes=70),
+                      "attendees": ["attendee@example.com"]}, {}, now)
+check("successful scheduling prints nothing", out.getvalue() == "")
+check("successful scheduling still claims", json.load(open(sm.STATE))[sm.key_of(
+    {"uid": "q1", "start": now + timedelta(minutes=70)})]["status"] == "claimed")
+tomorrow = (now.replace(hour=21, minute=5) + timedelta(days=1)).replace(hour=15, minute=0)
+ics = ("BEGIN:VCALENDAR\n" + ics_event("g1", tomorrow.astimezone(timezone.utc).strftime(":%Y%m%dT%H%M%SZ"),
+                                       attendees=["attendee@example.com"]) + "END:VCALENDAR")
+sm.urllib.request.urlopen = lambda *a, **k: io.BytesIO(ics.encode())
+os.environ.setdefault("TWIN_CALENDAR_ICS_URL", "http://fixture")
+_real_now = sm.local_now
+sm.local_now = lambda: now.replace(hour=21, minute=5)
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    sm.main()
+check("21:00 pass sends no goal question", out.getvalue() == "")
+sm.subprocess.run, sm.heartbeat, sm.urllib.request.urlopen, sm.local_now = _real_run, _real_hb, _real_urlopen, _real_now
+
 if FAILS:
     print(f"PREP PHYSICS: {len(FAILS)} FAILED")
     sys.exit(1)
-print("PREP PHYSICS: all 26 fixtures pass")
+print("PREP PHYSICS: all 29 fixtures pass")

@@ -14,7 +14,7 @@
 | scope filter: outside-circle attendee OR video link | inferring the goal when unstated |
 | the 75-min catch-up window + 20-min claim lease | composing the half-page |
 | state JSON (claimed/delivered/failed) | choosing the 1-2 opening questions |
-| 21:00 goal-ask detection | answering "have we met before?" from corpus |
+| | answering "have we met before?" from corpus |
 | heartbeat metric | |
 
 ## Spec deviation (honest note)

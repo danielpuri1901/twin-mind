@@ -28,6 +28,3 @@ mcp_servers:
   notion:
     url: https://mcp.notion.com/mcp
     auth: oauth
-  granola:
-    url: https://mcp.granola.ai/mcp
-    auth: oauth

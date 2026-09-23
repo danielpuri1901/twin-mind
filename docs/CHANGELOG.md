@@ -1,6 +1,43 @@
 # Twin Mind - canonical changelog
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
+## 2026-09-23 - meetings move from Granola to Wispr Flow; prep sends one message, not three
+
+Daniel reported the prep "running twice": a message the day before and the correct one before the meeting.
+Root cause, confirmed in the box logs, Bedrock invocation logs and a read-only replay against the live calendar: there was one poller and one dossier run per meeting.
+The poller runs as a no-agent cron, so its own stdout is a Telegram message.
+The 21:00 goal question (day before) and the "prep scheduled" status line (T-75) both reached Telegram and read as extra preps.
+
+### LEARNINGS TODAY - by subject (teach whichever is not yet on the taught list)
+
+**1. In a no-agent cron, every print is a user-facing message**
+`scan_meetings.py` now prints only failures.
+The 21:00 goal question and the success status line are removed.
+3 new fixtures in `evals/test_prep_scan.py` pin it (29 total).
+
+**2. Use the vendor's official integration, and check which way it moves data**
+Wispr Flow Notetaker has no webhooks, no Zapier app and no REST API.
+The only integration is a read-only remote MCP (`https://api.wisprflow.ai/connect/mcp`), so the box pulls.
+New `pipeline/ingest_wispr_meetings.py` replaces the Granola summary ingester: verbatim transcript plus summary per meeting, windowed and context-prefixed like the rest of the corpus, incremental inserts only.
+Long summaries split at `###` sections so nothing is cut at the 2048-char embed cap.
+Backfill: 9 meetings, 225 records, 0 failures; a second run is a no-op.
+`corpus-search` returns the right meeting in the top 3 for an interview-case query and a client-debrief query.
+
+**3. A heartbeat proves the job ran, not that data arrived**
+The box index had not changed since Jul 21: the Granola ingester kept heartbeating while it saved nothing, so its alarm stayed green for two months.
+The new ingester emits `MeetingIngestRan` (job ran) and `MeetingsIngested` (meetings saved).
+Alarms: `twin-mind-meeting-ingest-deadman` (12h without a run) and `twin-mind-meeting-freshness` (7 days without a new meeting).
+
+**4. One OAuth token family, one owner**
+The Wispr Flow token lives only on the box (`wispr-ingest.json`), moved through a short-lived SecureString parameter, then deleted from the Mac.
+A forced refresh on the headless box returned a new token and a rotated refresh token.
+
+Also: weekly recap reads this week's meetings from `corpus.db` instead of a Mac folder (`evals/test_recap_meetings.py`, 8 fixtures).
+Granola retired: Mac launchd poller unloaded, Mac and box Granola tokens and MCP entries removed, `fetch_granola.py`, `ingest_meeting_summaries.py` and their test deleted, old alarm deleted.
+Prep skill searches corpus meeting history by name and company (Wispr Flow often labels speakers "Speaker 1/2").
+
+Shipped to the box: poller fix, prep skill, ingester, recap, `summary-ingest.service` pointed at the new ingester; index backed up as `*.pre-wispr-20260923-112016`. eval.sh green.
+
 ## 2026-08-15 - novelty gate: the brief stops resurfacing the same AI items (semantic dedup in code)
 
 The AI ADVANCEMENTS section kept saying the same stuff. Root cause: dedup was the model's job - a phrase list pasted into the prompt with "don't repeat" - which it rephrases around, and the injected tail scrolls off so old items cycle back.

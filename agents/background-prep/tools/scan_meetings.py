@@ -5,10 +5,11 @@ Runs every 15 min as --no-agent cron. Deterministic tier:
   Daniel, OR a video link in DESCRIPTION) -> idempotent catch-up trigger:
   any qualifying meeting starting within 75 min with no delivered prep and no live
   claim gets a one-shot prep agent scheduled (claim = 20-min lease, not a tombstone).
-21:00 pass: thin-context calls tomorrow -> goal question to Daniel.
+stdout IS a Telegram message (no-agent job): print only failures. The 21:00 goal question and
+the "prep scheduled" line were removed 2026-09-23 - they read as a second, early prep.
 State: ~/.hermes/state/prep-state.json  {key: {status, ts, start}}  key = UID|occurrence-start.
 Heartbeat: PrepPollerRan metric (its own dead-man watches the watcher).
-Silent when healthy; prints only actions/problems (watchdog pattern).
+Silent when healthy; prints only problems (watchdog pattern).
 """
 import json, os, re, subprocess, sys, urllib.request
 from datetime import datetime, timedelta, timezone
@@ -189,8 +190,6 @@ def schedule_prep(ev, st, now, hermes="~/.hermes/hermes-agent/venv/bin/hermes"):
         st[key_of(ev)] = {"status": "failed", "ts": now.isoformat(), "err": r.stderr[:100]}
         save_state(st)
         print(f"PREP SCHEDULING FAILED for {ev.get('summary')}: {r.stderr[:150]}")
-    else:
-        print(f"prep scheduled: {ev.get('summary','?')} ({delta} min out){late}")
 
 
 def heartbeat():
@@ -212,18 +211,6 @@ def main():
     for ev in evs:
         if qualifies(ev, circ) and due(ev, st, now):
             schedule_prep(ev, st, now)
-    # 21:00 pass: goal-ask for tomorrow's thin-context calls (first call = no granola history check
-    # here; the agent handles depth - this just asks when NO stated goal exists yet)
-    if now.hour == 21 and now.minute < 15:
-        for ev in evs:
-            k = key_of(ev)
-            if (qualifies(ev, circ) and ev["start"].date() == (now + timedelta(days=1)).date()
-                    and not st.get(k, {}).get("goal") and not st.get(k, {}).get("asked")):
-                print(f"GOAL QUESTION: Tomorrow you have '{ev.get('summary','?')}' at "
-                      f"{ev['start'].strftime('%H:%M')} - what do you want out of it? "
-                      f"(reply 'goal {ev.get('summary','')[:20]}: ...')")
-                st[k] = {**st.get(k, {}), "asked": now.isoformat(), "start": ev["start"].isoformat()}
-        save_state(st)
     heartbeat()
 
 

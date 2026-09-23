@@ -25,7 +25,7 @@ MODEL = "eu.anthropic.claude-sonnet-4-6"
 # .../agents/weekly-recap/tools/recap.py -> repo root is four dirs up
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 CHANGELOG = os.path.join(REPO, "docs", "CHANGELOG.md")
-TRANSCRIPTS = os.path.expanduser("~/twin-corpus/raw/transcripts-inbox")  # Granola meeting captures
+CORPUS_DB = os.path.join(os.environ.get("TWIN_CORPUS", os.path.expanduser("~/twin-corpus")), "index", "corpus.db")
 
 
 def changelog_week(days=7):
@@ -50,25 +50,29 @@ def changelog_week(days=7):
     return "\n".join(out).strip()
 
 
-def meetings_week(days=7):
-    """This week's captured meetings (Granola transcripts, filenames YYYY-MM-DD-*.md).
-    A grounded real-life source. Returns dated title + transcript (truncated per meeting).
-    Only what was actually captured - the recap cannot mirror a meeting that was never recorded."""
-    if not os.path.isdir(TRANSCRIPTS):
+def meetings_week(days=7, db_path=None):
+    """This week's captured meetings, read from the corpus index (source 'meeting' = Wispr Flow,
+    'meeting-summary' = older Granola). One block per meeting: summary first, then transcript
+    chunks, truncated per meeting. Only what was actually captured - the recap cannot mirror a
+    meeting that was never recorded. Missing index -> '' so the recap still composes."""
+    import sqlite3
+    path = db_path or CORPUS_DB
+    if not os.path.exists(path):
         return ""
-    cutoff = datetime.now(TZ).date() - timedelta(days=days)
+    cutoff = (datetime.now(TZ).date() - timedelta(days=days)).isoformat()
+    db = sqlite3.connect(path)
+    rows = db.execute(
+        "SELECT chat, date, text FROM msgs WHERE source IN ('meeting', 'meeting-summary') "
+        "AND substr(date, 1, 10) >= ? ORDER BY chat, who != 'summary', rowid", (cutoff,)).fetchall()
+    db.close()
+    meetings = {}
+    for chat, date, text in rows:
+        body = re.sub(r"^\[[^\]]*\]\n", "", text or "")  # drop the contextual-embedding header
+        meetings.setdefault(chat, (date[:10], []))[1].append(body)
     out = []
-    for fn in sorted(os.listdir(TRANSCRIPTS)):
-        m = re.match(r"(\d{4}-\d{2}-\d{2})-(.+)\.md$", fn)
-        if not m:
-            continue
-        try:
-            if datetime.strptime(m.group(1), "%Y-%m-%d").date() < cutoff:
-                continue
-        except ValueError:
-            continue
-        body = open(os.path.join(TRANSCRIPTS, fn)).read()[:8000]
-        out.append(f"### MEETING {m.group(1)} - {m.group(2).replace('-', ' ')}\n{body}")
+    for chat, (day, parts) in sorted(meetings.items(), key=lambda kv: kv[1][0]):
+        title = chat[11:].replace("-", " ") if chat[:10] == day else chat
+        out.append(f"### MEETING {day} - {title}\n" + "\n".join(parts)[:8000])
     return "\n\n".join(out).strip()
 
 
