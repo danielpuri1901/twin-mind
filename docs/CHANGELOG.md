@@ -1,4 +1,26 @@
 # Twin Mind - canonical changelog
+
+## 2026-09-23
+
+Memory architecture v2, designed and started.
+
+Found that the twin's long-term memory was the context window of one Telegram session open since 2026-07-20, holding 56 active messages and 2,259 compacted ones.
+Anthropic's agent-design reference states that compaction works inside a session and that memory is the only cross-session mechanism, so the twin had a semantic tier and a procedural tier but no episodic tier.
+Also found `~/.hermes/memories/MEMORY.md`, written 2026-09-01, asserting that retrieval is keyword-only with no vector database, which is false and had been replaying into every session since.
+
+Corpus ingestion has been stopped since July: gmail ends 2026-07-02, imessage 2026-06-28, transcripts 2026-06-29, gchat 2020-10-26.
+Only `summary-ingest.timer` still runs, so meetings are the single live source.
+Telegram, WhatsApp and the Claude conversations were never wired in at all.
+
+Decisions: corpus moves to S3 including raw (amends the 2026-07-02 rule), the day's conversation appends to the corpus as `twin-chat`, sessions are cut daily at 04:00, and the day-start block is mechanical.
+
+Written: `docs/2026-09-23-twin-memory-v2-design.md`, and the `twin-episodic` Hermes plugin (`infra/hermes-plugins/twin-episodic/`).
+The plugin hooks `session_finalize` and `session_reset` to write the closed conversation into the corpus, and `pre_llm_call` to inject the previous conversation on the first turn only.
+Tested locally against a fixture: records normalize correctly, tool turns are skipped, re-ingest is idempotent, the day-start block renders verbatim with open threads, and the staleness limit suppresses it.
+
+Not deployed. Remote writes to the box are blocked by the permission classifier, so the plugin is in the repo but not on the box, and the S3 migration has not started.
+`gateway/config.py` shows the session reset triggers are `/new` and `/reset`, which is the mechanism the daily cut will use.
+
 One dated entry per working session. Newest on top. The full narrative lives in RETROSPECTIVE.md; this file is the terse ledger.
 
 ## 2026-09-23 - meetings move from Granola to Wispr Flow; prep sends one message, not three

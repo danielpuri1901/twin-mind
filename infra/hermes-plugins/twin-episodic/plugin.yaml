@@ -1,0 +1,8 @@
+name: twin-episodic
+version: "0.1.0"
+description: "Episodic memory. On session close, write the finished conversation into the corpus as the twin-chat source. On the first turn of a new session, inject yesterday's last exchanges and open threads, mechanically, with no model call. Fail-open."
+author: twin-mind
+hooks:
+  - session_finalize
+  - session_reset
+  - pre_llm_call
