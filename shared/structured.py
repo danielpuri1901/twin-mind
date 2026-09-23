@@ -18,6 +18,7 @@ default. If it still fails after the retries, we RAISE. A parse failure is loud,
 """
 import boto3
 from pydantic import BaseModel, ValidationError
+from shared.bedrock_profiles import route_model
 
 try:
     from langsmith import traceable, tracing_context
@@ -54,7 +55,7 @@ def structured_call(model_id, system, user, schema, *, max_tokens=2500, temperat
     last_err = "no attempt"
     for _ in range(retries + 1):
         r = _brt.converse(
-            modelId=model_id, messages=messages, system=[{"text": system}],
+            modelId=route_model(model_id), messages=messages, system=[{"text": system}],
             toolConfig={"tools": [tool], "toolChoice": {"tool": {"name": tool_name}}},
             inferenceConfig={"temperature": temperature, "maxTokens": max_tokens})
         blocks = r["output"]["message"]["content"]

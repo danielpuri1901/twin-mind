@@ -5,6 +5,8 @@
 set -e
 cd "$(dirname "$0")/.."
 PY="$HOME/.hermes/hermes-agent/venv/bin/python"
+echo "== Bedrock profile routing (deterministic, free) =="
+"$PY" evals/test_bedrock_profiles.py
 echo "== tool regression tests (deterministic, free) =="
 python3 evals/test_tools.py
 echo "== project activity collector (deterministic, free) =="

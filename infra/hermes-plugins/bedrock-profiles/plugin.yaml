@@ -1,0 +1,4 @@
+name: bedrock-profiles
+version: "0.1.0"
+description: "Routes Twin Claude SDK calls through the tagged EU application profile without changing model detection or caching."
+author: twin-mind

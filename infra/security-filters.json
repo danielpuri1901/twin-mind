@@ -1,0 +1,50 @@
+[
+  {
+    "filterName": "CloudTrailChanges",
+    "filterPattern": "{ ($.eventName = CreateTrail) || ($.eventName = UpdateTrail) || ($.eventName = DeleteTrail) || ($.eventName = StartLogging) || ($.eventName = StopLogging) }",
+    "metricTransformations": [
+      {
+        "metricName": "CloudTrailChanges",
+        "metricNamespace": "TwinMind/Security",
+        "metricValue": "1",
+        "defaultValue": 0.0
+      }
+    ]
+  },
+  {
+    "filterName": "ConsoleSignInWithoutMFA",
+    "filterPattern": "{ ($.eventName = \"ConsoleLogin\") && ($.additionalEventData.MFAUsed != \"Yes\") && ($.userIdentity.type = \"IAMUser\") && ($.responseElements.ConsoleLogin = \"Success\") }",
+    "metricTransformations": [
+      {
+        "metricName": "ConsoleSignInWithoutMFA",
+        "metricNamespace": "TwinMind/Security",
+        "metricValue": "1",
+        "defaultValue": 0.0
+      }
+    ]
+  },
+  {
+    "filterName": "IAMPolicyChanges",
+    "filterPattern": "{ ($.eventName = DeleteGroupPolicy) || ($.eventName = DeleteRolePolicy) || ($.eventName = DeleteUserPolicy) || ($.eventName = PutGroupPolicy) || ($.eventName = PutRolePolicy) || ($.eventName = PutUserPolicy) || ($.eventName = CreatePolicy) || ($.eventName = DeletePolicy) || ($.eventName = CreatePolicyVersion) || ($.eventName = DeletePolicyVersion) || ($.eventName = AttachRolePolicy) || ($.eventName = DetachRolePolicy) || ($.eventName = AttachUserPolicy) || ($.eventName = DetachUserPolicy) || ($.eventName = AttachGroupPolicy) || ($.eventName = DetachGroupPolicy) || ($.eventName = CreateAccessKey) || ($.eventName = CreateUser) }",
+    "metricTransformations": [
+      {
+        "metricName": "IAMPolicyChanges",
+        "metricNamespace": "TwinMind/Security",
+        "metricValue": "1",
+        "defaultValue": 0.0
+      }
+    ]
+  },
+  {
+    "filterName": "RootAccountUsage",
+    "filterPattern": "{ $.userIdentity.type = \"Root\" && $.userIdentity.invokedBy NOT EXISTS && $.eventType != \"AwsServiceEvent\" }",
+    "metricTransformations": [
+      {
+        "metricName": "RootAccountUsage",
+        "metricNamespace": "TwinMind/Security",
+        "metricValue": "1",
+        "defaultValue": 0.0
+      }
+    ]
+  }
+]

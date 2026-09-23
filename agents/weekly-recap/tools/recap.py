@@ -100,6 +100,8 @@ WHO YOU MET (include ONLY if MEETINGS are provided in the input):
 
 def compose(changelog_block, reflection):
     import boto3
+    sys.path.insert(0, REPO)
+    from shared.bedrock_profiles import route_model
     brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
     today = datetime.now(TZ).strftime("%A, %d %B %Y")  # code owns the date; the model never guesses it
     meetings = meetings_week()
@@ -110,7 +112,7 @@ def compose(changelog_block, reflection):
             f"{meetings or '(no meetings captured this week)'}\n\n"
             f"DANIEL'S REFLECTION (his words - keep them, never invent or extend):\n"
             f"{(reflection or '').strip() or '(none provided)'}")
-    r = brt.converse(modelId=MODEL, system=[{"text": SYS}],
+    r = brt.converse(modelId=route_model(MODEL), system=[{"text": SYS}],
                      messages=[{"role": "user", "content": [{"text": user}]}],
                      inferenceConfig={"maxTokens": 3500, "temperature": 0})
     return next(c["text"] for c in r["output"]["message"]["content"] if "text" in c)

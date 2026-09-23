@@ -22,6 +22,7 @@ web:
   extract_backend: firecrawl
 plugins:
   enabled:
+    - bedrock-profiles
     - observability/langfuse
   disabled: []
 mcp_servers:

@@ -1,5 +1,5 @@
 {
-  "BudgetName": "twin-mind-monthly",
+  "BudgetName": "account-monthly",
   "BudgetLimit": {
     "Amount": "50",
     "Unit": "USD"
@@ -9,10 +9,5 @@
   "CostTypes": {
     "IncludeCredit": false,
     "IncludeRefund": false
-  },
-  "CostFilters": {
-    "TagKeyValue": [
-      "user:project$twin-mind"
-    ]
   }
 }

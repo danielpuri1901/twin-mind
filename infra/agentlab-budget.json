@@ -1,5 +1,5 @@
 {
-  "BudgetName": "twin-mind-monthly",
+  "BudgetName": "agentlab-monthly-cost",
   "BudgetLimit": {
     "Amount": "50",
     "Unit": "USD"
@@ -12,7 +12,7 @@
   },
   "CostFilters": {
     "TagKeyValue": [
-      "user:project$twin-mind"
+      "user:project$agentlab"
     ]
   }
 }
