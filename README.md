@@ -15,7 +15,8 @@ It runs as one standalone page with no server setup.
 - **Morning brief:** Produces one daily email from calendar events, inbox signals, weather, recent AI work, project activity.
 - **Background prep:** Creates a short dossier before professional meetings.
 - **Interactive chat:** Grounds Telegram replies in a private personal corpus.
-- **Weekly recap:** Collects build progress plus personal reflection into one review.
+- **Weekly recap:** Collects build progress, the week's meetings, and personal reflection into one review.
+- **Meeting ingest:** Pulls finished meetings from Wispr Flow every 4 hours, so transcripts become searchable context.
 
 Twin Mind focuses on tasks that need persistent memory, proactive timing, private context.
 A general chatbot remains better for isolated questions.
@@ -72,7 +73,8 @@ Run free checks directly:
 python3 evals/test_tools.py
 python3 evals/test_prep_scan.py
 python3 evals/test_brief_check.py
-python3 evals/test_granola_fetch.py
+python3 evals/test_wispr_ingest.py
+python3 evals/test_recap_meetings.py
 ```
 
 The full ship gate uses Bedrock, so it can create a small model charge:
@@ -88,7 +90,7 @@ evals/eval.sh
 | `agents/` | One folder per production agent. |
 | `shared/` | Corpus access, structured output, shared policy. |
 | `evals/` | Regression checks, judges, job-specific evaluation tools. |
-| `pipeline/` | Local data normalization, chunking, embedding. |
+| `pipeline/` | Data normalization, chunking, embedding, plus the box-side meeting ingester. |
 | `infra/` | Private host templates, monitoring, runtime plugins. |
 | `docs/` | Design records, visual maps, technical decisions. |
 

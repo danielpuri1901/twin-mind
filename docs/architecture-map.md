@@ -65,7 +65,8 @@ This is the pipeline the 2026-07-21 work upgraded: windowed chunking + contextua
 ```mermaid
 flowchart LR
     subgraph SOURCES["Sources"]
-        G["Granola meetings"]
+        W["Wispr Flow meetings<br/>(official read-only MCP)"]
+        G["Granola meetings<br/>(retired 2026-09, history kept)"]
         IM["iMessage"]
         GC["Google Chat"]
         EM["Gmail"]
@@ -73,7 +74,7 @@ flowchart LR
         CON["Contacts"]
     end
 
-    G -->|"fetch_granola.py"| INBOX["raw/transcripts-inbox/"]
+    G -->|"historical transcripts"| INBOX["raw/transcripts-inbox/"]
     INBOX -->|"normalize_transcripts.py"| NORM
     IM -->|normalize_imessage.py| NORM
     GC -->|normalize_gchat.py| NORM
@@ -88,6 +89,9 @@ flowchart LR
 
     CTX -->|"embed_corpus.py<br/>Cohere embed-multilingual-v3 (Bedrock)"| VEC[("vectors.db<br/>sqlite-vec, 1024-dim")]
     CTX -->|"build_index.py<br/>FTS5"| FTS[("corpus.db<br/>keyword index")]
+
+    W -->|"ingest_wispr_meetings.py<br/>(box, every 4h, same windowing + context prefix,<br/>incremental inserts, never a rebuild)"| FTS
+    W -->|"ingest_wispr_meetings.py"| VEC
 
     VEC --> SEARCH
     FTS --> SEARCH

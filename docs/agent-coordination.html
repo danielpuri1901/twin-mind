@@ -31,7 +31,7 @@ flowchart TB
     subgraph AGENTS["THE AGENTS - peers, each on its own clock, none aware of the others"]
         direction LR
         CHAT["💬 chat twin<br/>(the ONE Hermes AGENT)<br/>ambiguous stuff: Q&A,<br/>coach, journaling, weather"]
-        ING["📥 summary-ingest<br/>script · every 4h"]
+        ING["📥 meeting-ingest<br/>Wispr Flow · every 4h"]
         BRIEF["📋 brief<br/>pipeline + 1 LLM call · 07:30"]
         PREP["🗂 background-prep<br/>script · every 15 min"]
         RECAP["🗓 weekly-recap<br/>scripts + 1 LLM call · Friday"]
@@ -49,10 +49,11 @@ flowchart TB
         DATA["🏷 datasets/<br/>your verdicts · fixtures"]
     end
 
-    ING -- "writes meeting summaries" --> CORPUS
+    ING -- "writes meeting transcripts + summaries" --> CORPUS
     BRIEF -- "reads" --> CORPUS
     PREP -- "reads" --> CORPUS
     CHAT -- "reads" --> CORPUS
+    RECAP -- "reads meetings" --> CORPUS
 
     BRIEF -- "notes to its future self" --> NOTES
     RECAP -- "nudge-time + sent-marker" --> NOTES
@@ -75,7 +76,7 @@ flowchart TB
   (Both outages this week - the recap race and the Granola token death - were violations of this law.)</div>
   <b>Examples you've lived:</b>
   <ul>
-    <li><b>granola → brief:</b> the ingester drops summaries into the corpus; the brief just reads the corpus. They never meet.</li>
+    <li><b>meetings → prep + recap:</b> the Wispr Flow ingester writes meetings into the corpus; prep and the weekly recap just read the corpus. They never meet.</li>
     <li><b>brief → tomorrow's brief:</b> covered-topics lists in <code>state/</code> - an agent leaving notes for its future self.</li>
     <li><b>us → brief:</b> we write a learning into the CHANGELOG; next morning the brief teaches it to you.</li>
     <li><b>brief → the eval gate:</b> every real morning is saved as a fixture; the gate replays it before anything ships.</li>
