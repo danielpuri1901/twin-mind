@@ -132,6 +132,60 @@ def _mark_done(session_id: str) -> None:
         logger.warning("twin-episodic could not mark %s done: %s", session_id, exc)
 
 
+EMBED_MODEL = "cohere.embed-multilingual-v3"
+_VEC_DB = os.path.join(_CORPUS, "index", "vectors.db")
+
+
+def _embed(records) -> int:
+    """Add the records to the vector index, incrementally.
+
+    Retrieval is hybrid, so a record that is only in FTS is findable by
+    keyword and invisible to a paraphrase. Every other source keeps exact
+    1:1 parity between corpus.db and vectors.db; this keeps twin-chat in
+    line. Same model, batch size and insert shape as
+    pipeline/ingest_wispr_meetings.py, which is the incremental path that
+    already works.
+    """
+    import boto3
+    import sqlite_vec
+
+    # Same floor the rest of the pipeline uses (embed_corpus.load_records):
+    # "ok", "Hello" and other acks carry no meaning to match on, so they cost
+    # an embed call and add noise to the index. They stay in the jsonl and in
+    # FTS, because they are still part of the conversation.
+    records = [r for r in records if len((r.get("text") or "").strip()) >= 12]
+    if not records:
+        return 0
+
+    brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
+    vecs = []
+    for i in range(0, len(records), 90):  # Cohere v3 takes up to 96 texts per call
+        body = json.dumps({
+            "texts": [r["text"][:2048] for r in records[i:i + 90]],
+            "input_type": "search_document",
+            "truncate": "END",
+        })
+        payload = brt.invoke_model(modelId=EMBED_MODEL, body=body)["body"].read()
+        vecs += json.loads(payload)["embeddings"]
+    db = sqlite3.connect(_VEC_DB, timeout=30)
+    try:
+        db.enable_load_extension(True)
+        sqlite_vec.load(db)
+        db.enable_load_extension(False)
+        rid = db.execute("SELECT COALESCE(MAX(rowid),0) FROM vec_meta").fetchone()[0]
+        for r, v in zip(records, vecs):
+            rid += 1
+            db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
+                       (rid, r["source"], r["chat"], r["date"], r["who"],
+                        r["sender"], r["text"]))
+            db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?,?)",
+                       (rid, sqlite_vec.serialize_float32(v)))
+        db.commit()
+    finally:
+        db.close()
+    return len(vecs)
+
+
 def _write(records) -> int:
     """Append to the normalized file and upsert into the search index."""
     if not records:
@@ -152,6 +206,10 @@ def _write(records) -> int:
         conn.close()
     except Exception as exc:  # the jsonl is the durable copy; the index can be rebuilt
         logger.warning("twin-episodic index write failed: %s", exc)
+    try:
+        logger.info("twin-episodic embedded %d records", _embed(records))
+    except Exception as exc:  # lexical recall still works; never lose the write
+        logger.warning("twin-episodic embed failed: %s", exc)
     return len(records)
 
 
