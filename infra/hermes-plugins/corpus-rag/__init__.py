@@ -86,6 +86,7 @@ def on_pre_llm_call(*, user_message: str = "", conversation_history=None, sessio
         hits = _retrieve(msg)
         if not hits:
             return None
+        logger.info("corpus-rag injected %d hits (session %s)", len(hits), session_id)
         return {"context": _format(hits)}
     except Exception as exc:  # fail-open - never break a live turn
         logger.debug("corpus-rag pre_llm_call failed: %s", exc)
