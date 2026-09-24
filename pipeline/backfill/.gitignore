@@ -1,0 +1,6 @@
+# The meeting content this script reads is private: it contains third-party
+# names, a family legal case, salary figures and other companies' internals.
+# It lives on the box and in a local scratchpad, never in this repo, which
+# has a GitHub remote.
+granola_meetings.json
+*_meetings.json
