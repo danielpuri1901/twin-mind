@@ -1,5 +1,25 @@
 # Twin Mind - canonical changelog
 
+## 2026-09-28
+
+Episodic memory rebuilt after the first design turned out not to work.
+
+The 04:00 session cut never cut anything. It restarted the gateway on the assumption that a restart ends the session and fires `on_session_finalize`.
+Sessions survive restarts: the one opened 2026-07-20 lived through the 2026-09-24 restart and only ended on 2026-09-25 by `session_reset`.
+So five nights produced a "gateway closed" notification each morning, no session boundary, and 122 real messages sitting unindexed in state.db.
+
+Replaced with `pipeline/ingest_twin_chat.py` on a 30-minute timer: reads state.db, takes messages the ledger has not seen, appends them to the corpus with vectors.
+Idempotent on Hermes message id, with a one-time seed of 2,572 ids from the 2026-09-24 session-keyed backfill so nothing double-writes.
+Backfilled the 122 messages: 82 real turns after dropping tool and system rows, all embedded.
+`twin-chat` is now 269 records and parity is exact across all eight sources.
+The restart timer is disabled and `twin-episodic` is down to the day-start injection only.
+
+Also corrected: the INFO instrumentation added on 2026-09-24 to prove whether `corpus-rag` fires could never have worked.
+The gateway journals WARNING and above, so zero INFO lines appear in six days regardless of what happens.
+That question is still open and needs a file-based counter, not a log line.
+
+Still open: the `ONE TECHNICAL THING` section missing from today's brief, and the unreviewed `enterprise-agent-architecture` skill the watchdog flags every morning.
+
 ## 2026-09-23
 
 Memory architecture v2, designed and started.
