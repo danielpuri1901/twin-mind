@@ -27,14 +27,21 @@ from datetime import datetime, timedelta, timezone
 CORPUS = os.environ.get("TWIN_CORPUS_DIR") or os.path.expanduser("~/twin-corpus")
 DB = os.path.join(CORPUS, "index", "corpus.db")
 
-# Source -> days of silence before it counts as stale.
+# Sources that are FINISHED, not broken (Daniel's call, 2026-09-28). A one-off
+# export that will never update again is not an incident, and alerting on it
+# every morning trains you to ignore the alarm. Gmail moved to a tool: the
+# corpus keeps Daniel's own sent mail as voice, and freshness is fetched on
+# demand rather than bulk-ingested. iMessage and Google Chat he no longer
+# uses. Their history stays in the corpus and stays searchable.
+ARCHIVED = {"gmail", "imessage", "gchat", "contacts", "gcal"}
+
+# Live sources, with the days of silence that mean something is wrong. The
+# rhythms differ: meetings land most working days, twin-chat every day he
+# talks to it, Granola transcripts less often.
 THRESHOLDS = {
     "meeting": 7,
     "twin-chat": 3,
-    "gmail": 7,
-    "imessage": 14,
     "transcript": 14,
-    "gcal": 14,
 }
 DEFAULT_THRESHOLD = 30
 
@@ -67,6 +74,8 @@ def stale_sources(state, now=None):
     now = now or datetime.now(timezone.utc)
     out = []
     for source, (newest, count) in state.items():
+        if source in ARCHIVED:
+            continue
         limit = THRESHOLDS.get(source, DEFAULT_THRESHOLD)
         if newest is None:
             out.append((source, None, count, limit))

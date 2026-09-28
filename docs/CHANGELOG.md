@@ -1,5 +1,26 @@
 # Twin Mind - canonical changelog
 
+## 2026-09-28 (later)
+
+Rebuilt twin-chat from state.db and cut the machine mail out of the corpus.
+
+The 2026-09-24 backfill had read sessions through `hermes sessions export`, which returns a session's ACTIVE messages and not its compacted ones.
+The July session held 2,259 compacted against 56 active, so the backfill saw 187 turns where 1,918 existed, and the ledger seed then marked all 2,572 ids done so the timer would never have gone back.
+Rebuilt from state.db, which keeps every message: twin-chat is 1,918 records and 1,894 vectors, July 331, August 402, September 1,185.
+Nothing was ever lost; it was simply never read.
+
+Gmail: 60% of the 5,421 records came from noreply senders, led by no-reply@twitch.tv with 851 and Steam with 325, together outnumbering everything Daniel has written.
+That noise was degrading retrieval, not sitting inert: the query "keeping my private files in cloud storage" used to return four iCloud billing emails.
+Removed 2,415 machine-mail records and their vectors, protecting every who='me' row.
+Gmail is now 3,006 records: 1,105 his own writing, 1,901 real correspondents.
+Restore file at normalized/gmail-noise-removed-20260928.jsonl, and the raw export is unchanged on the Mac and in S3.
+
+Semantic memory changes shape by Daniel's call: email becomes a tool rather than a bulk feed, and gmail, imessage, gchat, contacts and gcal are marked ARCHIVED in the staleness checker.
+A finished one-off export is not an incident, and alerting on it every morning trains you to ignore the alarm.
+Live sources are now meeting, twin-chat and transcript. The alarm reports all sources fresh for the first time.
+
+Separate task, not started: cleaning the real Gmail mailbox, 14,000 unread. That one touches live mail, so the rule is label and archive, never delete, with Daniel approving sender rules first.
+
 ## 2026-09-28
 
 Episodic memory rebuilt after the first design turned out not to work.
