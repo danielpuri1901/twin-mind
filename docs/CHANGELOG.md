@@ -17,7 +17,9 @@ Context compaction has failed on every session since 2026-09-24, and the 2026-09
 The id is right: `eu.anthropic.claude-haiku-4-5-20251001-v1:0` answers in eu-west-1 from the box.
 The region is wrong: Hermes builds the auxiliary Bedrock client from `resolve_bedrock_region()`, which reads only `AWS_REGION` and `AWS_DEFAULT_REGION` and falls back to us-east-1, while the main model takes `region: eu-west-1` from `config.yaml`.
 Neither variable is set in the gateway's environment, so every compaction summary went to us-east-1, where the eu profile does not exist, and the compressed middle of each long session was replaced by a fallback marker.
-Fix, not yet applied: add `AWS_REGION=eu-west-1` to `~/.hermes/.env`, restart the gateway, then watch `journalctl -u hermes-gateway | grep context_compressor` on the next long session.
+Fixed at 10:51 CEST: `AWS_REGION=eu-west-1` appended to `~/.hermes/.env` and the gateway restarted.
+Verified on the real path, not by inspection: with the gateway's environment loaded, `resolve_bedrock_region()` returns eu-west-1, `resolve_provider_client("bedrock", ..., task="compression")` now returns an `AnthropicAuxiliaryClient` on `bedrock-runtime.eu-west-1`, and a Haiku call through that client answers; before the change the same call returned no client at all.
+The first long session will show the summary line in `journalctl -u hermes-gateway | grep context_compressor`.
 
 Also seen.
 `weekly-recap-poll.service` sat failed since 2026-09-25 on the quoted-ARN bug; the fix is deployed and the next run is Friday 18:03.
