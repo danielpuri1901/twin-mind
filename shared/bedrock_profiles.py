@@ -14,14 +14,32 @@ from functools import wraps
 MODEL = 'eu.anthropic.claude-sonnet-4-6'
 
 
+def _clean(value):
+    """Strip the quotes a .env line may carry.
+
+    systemd strips matching quotes when it loads an EnvironmentFile, so the
+    gateway always saw a clean ARN and this went unnoticed. A script reading
+    the same file directly did not, and handed Bedrock an ARN wrapped in
+    apostrophes, which fails as "The provided model identifier is invalid" -
+    an error that names the model and says nothing about quoting. Every other
+    env loader in this repo already strips them; this one did not.
+    """
+    value = (value or '').strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+        value = value[1:-1]
+    return value.strip()
+
+
 def _profile_arn():
     if os.environ.get('TWIN_BEDROCK_PROFILE_ARN'):
-        return os.environ['TWIN_BEDROCK_PROFILE_ARN']
+        return _clean(os.environ['TWIN_BEDROCK_PROFILE_ARN']) or None
     try:
         for line in open(os.path.expanduser('~/.hermes/.env')):
             key, _, value = line.strip().partition('=')
-            if key == 'TWIN_BEDROCK_PROFILE_ARN' and value:
-                return value
+            if key == 'TWIN_BEDROCK_PROFILE_ARN':
+                cleaned = _clean(value)
+                if cleaned:
+                    return cleaned
     except OSError:
         pass
     return None
