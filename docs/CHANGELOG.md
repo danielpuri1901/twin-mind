@@ -1,5 +1,29 @@
 # Twin Mind - canonical changelog
 
+## 2026-10-02
+
+Nine commits pushed to the public remote, with the account identifiers taken out of history first.
+
+`shared/corpus_sync.py` carried the bucket name, which includes the AWS account id, and the KMS key id as defaults.
+The repo is public and `.env.example` already treats AWS identifiers as private, so the unpushed commit that introduced them was rewritten before the push.
+Both values now come from `TWIN_CORPUS_BUCKET` and `TWIN_CORPUS_KMS_KEY`, a run with either one missing stops before it uploads, and `.env.example` lists the placeholders.
+On the box a systemd drop-in sets both for `twin-corpus-sync` and `twin-corpus-sync-fast`; one fast run verified both trees synced.
+The old history is kept locally as `backup/main-before-rewrite`.
+The two `shared/push_*.sh` scripts had the instance id inline; they now read `infra/instance-id.txt` like everything else.
+The 2026-09-28 and 2026-09-29 work is committed in three commits (retrieval and index, ARN quoting, email tools) and not yet pushed.
+
+Context compaction has failed on every session since 2026-09-24, and the 2026-09-23 fix did not reach the gateway's own path.
+26 sessions carry `compression_failure_error`, and the journal shows `agent.context_compressor` and `agent.title_generator` both failing with "The provided model identifier is invalid".
+The id is right: `eu.anthropic.claude-haiku-4-5-20251001-v1:0` answers in eu-west-1 from the box.
+The region is wrong: Hermes builds the auxiliary Bedrock client from `resolve_bedrock_region()`, which reads only `AWS_REGION` and `AWS_DEFAULT_REGION` and falls back to us-east-1, while the main model takes `region: eu-west-1` from `config.yaml`.
+Neither variable is set in the gateway's environment, so every compaction summary went to us-east-1, where the eu profile does not exist, and the compressed middle of each long session was replaced by a fallback marker.
+Fix, not yet applied: add `AWS_REGION=eu-west-1` to `~/.hermes/.env`, restart the gateway, then watch `journalctl -u hermes-gateway | grep context_compressor` on the next long session.
+
+Also seen.
+`weekly-recap-poll.service` sat failed since 2026-09-25 on the quoted-ARN bug; the fix is deployed and the next run is Friday 18:03.
+`twin-mind-security-ConsoleSignInWithoutMFA` fired twice this week on Daniel's own console logins; the account-side follow-up is recorded outside this public ledger.
+Cost Explorer with credits excluded: untagged usage fell from $9.39 on 2026-09-29 to $0.15 on 2026-10-01 (partial day), so the inference profile routing works; the twin-mind line is still small and Cost Explorer lags a day.
+
 ## 2026-09-29 (reproducibility)
 
 The corpus can now be rebuilt from files, and 1,679 records that existed nowhere else are backed up.
