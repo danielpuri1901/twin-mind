@@ -19,9 +19,33 @@ DB = os.path.join(ROOT, "index", "corpus.db")
 VECDB = os.path.join(ROOT, "index", "vectors.db")
 
 
-def fts_query(raw):
-    # Quote each token so user text with FTS5 operators can't break the query.
-    return " ".join('"' + t.replace('"', "") + '"' for t in raw.split() if t.strip('"'))
+def fts_query(raw, require_all=False):
+    """Tokens quoted, then joined with OR unless every one is required.
+
+    The join matters more than it looks. FTS5 treats space-separated terms as
+    an implicit AND, and this function used to join with a space, so the
+    lexical lane demanded that EVERY word of the query appear in one record.
+    For a natural-language question that is almost never true.
+
+    Measured on LongMemEval_S, 470 labelled questions with 115k-token
+    histories, 2026-09-28:
+
+        implicit AND   recall@10 = 0.00
+        explicit OR    recall@10 = 0.84
+
+    It also explains a symptom that looked unrelated. The one record certain
+    to contain every word of a question is the question itself, so the only
+    thing the AND form could match was Daniel's own past phrasing of the same
+    question. The corpus appeared to retrieve his questions back at him
+    because that was the only match the query permitted.
+
+    BM25 still ranks, so OR does not mean loose: a record matching six rare
+    terms outranks one matching a single common term.
+    """
+    terms = ['"' + t.replace('"', "") + '"' for t in raw.split() if t.strip('"')]
+    if not terms:
+        return ""
+    return " ".join(terms) if require_all else " OR ".join(terms)
 
 
 def semantic_rows(query, k, since=None, until=None, who=None, chat=None):
@@ -80,12 +104,37 @@ def main():
     ap.add_argument("--chat", default=None,
                     help="filter to one conversation/correspondent (substring match)")
     ap.add_argument("--until", default=None, help="only records dated on/before this")
+    ap.add_argument("--as-of", dest="as_of", default=None,
+                    help="resolve relative dates against this date (YYYY-MM-DD) instead of "
+                         "today. Needed to replay a benchmark or a historical question, where "
+                         "'one year ago' means one year before the question was asked.")
+    ap.add_argument("--time-expand", dest="time_expand", action="store_true",
+                    help="resolve a relative date in the query into --since/--until. "
+                         "A regex gates the model call, so questions with no temporal "
+                         "cue cost nothing. Explicit --since/--until always win.")
+    ap.add_argument("--all", dest="require_all", action="store_true",
+                    help="require EVERY token to appear in the record. Rarely what you "
+                         "want: it scored 0.00 recall@10 on LongMemEval_S, because a "
+                         "natural-language question has no record containing all its words")
     ap.add_argument("--any", action="store_true",
-                    help="OR semantics: match any token instead of all")
+                    help="deprecated and now the default; accepted so old callers keep working")
     ap.add_argument("--mode", choices=["lexical", "semantic", "hybrid"],
                     default="hybrid", help="retrieval backend (contract stays identical); "
                     "hybrid is the eval-chosen default (bake-off 2026-07-03)")
     args = ap.parse_args()
+
+    # Time expansion runs before either lane, because both of them filter on the
+    # same dates. Explicit flags win: a caller that named a range meant it.
+    if args.time_expand and not (args.since or args.until):
+        try:
+            import sys as _sys
+            _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from datetime import datetime as _dt
+            from shared.query_time import extract_range
+            ref = _dt.strptime(args.as_of, "%Y-%m-%d").date() if args.as_of else None
+            args.since, args.until = extract_range(args.query, ref)
+        except Exception:
+            pass  # fail open: no filter beats no answer
 
     cols = ["source", "chat", "date", "who", "sender", "text", "score"]
 
@@ -97,9 +146,7 @@ def main():
                 print(json.dumps(dict(zip(cols, row)), ensure_ascii=False))
             return
 
-    q = fts_query(args.query)
-    if args.any:
-        q = " OR ".join(q.split())
+    q = fts_query(args.query, require_all=args.require_all)
     sql = ("SELECT source, chat, date, who, sender, text, bm25(msgs) AS score "
            "FROM msgs WHERE msgs MATCH ?")
     params = [q]

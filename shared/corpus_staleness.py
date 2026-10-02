@@ -12,6 +12,24 @@ sends one Telegram message naming every source that has gone quiet.
 Thresholds are per source because the sources have different natural rhythms:
 meetings arrive most days, email most days, a classic paper rarely.
 
+It also checks index parity, which is the same class of problem one layer
+down. Retrieval is hybrid: a record indexed for keywords but missing from the
+vector index is found by an exact phrase and invisible to a paraphrase. That
+already happened. twin-chat sat at 187 FTS records and 0 vectors, every
+keyword search worked, and retrieval looked healthy.
+
+The invariant, measured against the live corpus on 2026-09-28 and exact on all
+eight sources:
+
+    per source:  count(FTS where length(trim(text)) >= 12)  ==  count(vec_meta)
+
+The 12 character floor is deliberate, and it is where the two counts
+legitimately differ from the raw record count: "ok" is worth indexing for
+keywords and worth nothing as a vector, so embed_corpus.load_records and
+ingest_twin_chat.embed both skip it. Applying the same floor to the FTS side
+is what turns a fuzzy "roughly equal" into an exact equality worth alerting
+on.
+
 Run daily from a timer. Exit code is 0 even when sources are stale, because a
 non-zero exit would only bury the alert in a unit failure.
 """
@@ -26,6 +44,11 @@ from datetime import datetime, timedelta, timezone
 
 CORPUS = os.environ.get("TWIN_CORPUS_DIR") or os.path.expanduser("~/twin-corpus")
 DB = os.path.join(CORPUS, "index", "corpus.db")
+VEC_DB = os.path.join(CORPUS, "index", "vectors.db")
+
+# Matches embed_corpus.load_records and ingest_twin_chat.MIN_EMBED_CHARS. If
+# either of those moves, this moves with it or the alarm cries wolf daily.
+MIN_EMBED_CHARS = 12
 
 # Sources that are FINISHED, not broken (Daniel's call, 2026-09-28). A one-off
 # export that will never update again is not an incident, and alerting on it
@@ -67,6 +90,41 @@ def newest_per_source(db_path: str = DB):
     finally:
         conn.close()
     return {src: (_parse(newest), count) for src, count, newest in rows}
+
+
+def vector_parity(db_path: str = DB, vec_path: str = VEC_DB):
+    """[(source, fts_eligible, vectors, delta)] for sources that disagree.
+
+    Read-only on both databases, so it is safe to run while an ingest is
+    mid-write; a torn read shows up as a mismatch that clears on the next run,
+    which is the right failure mode for a daily check.
+    """
+    fts = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    vec = sqlite3.connect(f"file:{vec_path}?mode=ro", uri=True)
+    try:
+        eligible = dict(fts.execute(
+            "select source, count(*) from msgs "
+            "where length(trim(text)) >= ? group by source", (MIN_EMBED_CHARS,)))
+        vectors = dict(vec.execute("select source, count(*) from vec_meta group by source"))
+    finally:
+        fts.close()
+        vec.close()
+    out = []
+    for source in sorted(set(eligible) | set(vectors)):
+        want, have = eligible.get(source, 0), vectors.get(source, 0)
+        if want != have:
+            out.append((source, want, have, have - want))
+    return out
+
+
+def format_parity_alert(rows) -> str:
+    lines = ["Index parity is broken:"]
+    for source, want, have, delta in rows:
+        lines.append(f"- {source}: {want} indexed records but {have} vectors ({delta:+d})")
+    lines.append("")
+    lines.append("A record missing from the vector index is found by exact keyword and "
+                 "invisible to a paraphrase, so retrieval will look like it works.")
+    return "\n".join(lines)
 
 
 def stale_sources(state, now=None):
@@ -112,9 +170,29 @@ def send(text: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", default=DB)
+    parser.add_argument("--vec-db", default=VEC_DB)
+    parser.add_argument("--parity-only", action="store_true",
+                        help="check index parity and skip the staleness check")
     parser.add_argument("--json", action="store_true", help="print state, send nothing")
     parser.add_argument("--dry-run", action="store_true", help="print the alert, send nothing")
     args = parser.parse_args()
+
+    # Parity first: a broken index is a live correctness problem, while a stale
+    # source is a freshness problem.
+    try:
+        mismatched = vector_parity(args.db, args.vec_db)
+    except Exception as exc:
+        print(f"parity check could not run: {exc}", file=sys.stderr)
+        mismatched = []
+
+    if args.parity_only:
+        if not mismatched:
+            print("index parity ok")
+            return 0
+        print(format_parity_alert(mismatched))
+        if not args.dry_run:
+            send(format_parity_alert(mismatched))
+        return 0
 
     try:
         state = newest_per_source(args.db)
@@ -123,17 +201,27 @@ def main() -> int:
         return 0
 
     if args.json:
-        print(json.dumps(
-            {s: {"newest": n.isoformat() if n else None, "records": c}
-             for s, (n, c) in state.items()}, indent=2))
+        print(json.dumps({
+            "sources": {s: {"newest": n.isoformat() if n else None, "records": c}
+                        for s, (n, c) in state.items()},
+            "parity_mismatches": [
+                {"source": s, "indexed": w, "vectors": h, "delta": d}
+                for s, w, h, d in mismatched],
+        }, indent=2))
         return 0
 
     stale = stale_sources(state)
-    if not stale:
-        print(f"all {len(state)} sources fresh")
+
+    if not stale and not mismatched:
+        print(f"all {len(state)} sources fresh, index parity ok")
         return 0
 
-    alert = format_alert(stale)
+    parts = []
+    if mismatched:
+        parts.append(format_parity_alert(mismatched))
+    if stale:
+        parts.append(format_alert(stale))
+    alert = "\n\n".join(parts)
     print(alert)
     if not args.dry_run:
         send(alert)

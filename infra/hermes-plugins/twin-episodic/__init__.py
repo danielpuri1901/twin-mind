@@ -133,6 +133,9 @@ def _mark_done(session_id: str) -> None:
 
 
 EMBED_MODEL = "cohere.embed-multilingual-v3"
+# Must equal shared/embedding.MAX_CHARS. Pinned by evals/test_embedding_contract.py,
+# which fails if any writer drifts.
+MAX_EMBED_CHARS = 2048
 _VEC_DB = os.path.join(_CORPUS, "index", "vectors.db")
 
 
@@ -161,7 +164,7 @@ def _embed(records) -> int:
     vecs = []
     for i in range(0, len(records), 90):  # Cohere v3 takes up to 96 texts per call
         body = json.dumps({
-            "texts": [r["text"][:2048] for r in records[i:i + 90]],
+            "texts": [r["text"][:MAX_EMBED_CHARS] for r in records[i:i + 90]],
             "input_type": "search_document",
             "truncate": "END",
         })
@@ -175,9 +178,9 @@ def _embed(records) -> int:
         rid = db.execute("SELECT COALESCE(MAX(rowid),0) FROM vec_meta").fetchone()[0]
         for r, v in zip(records, vecs):
             rid += 1
-            db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
+            db.execute("INSERT INTO vec_meta (rowid, source, chat, date, who, sender, text, model, embed_chars) VALUES (?,?,?,?,?,?,?,?,?)",
                        (rid, r["source"], r["chat"], r["date"], r["who"],
-                        r["sender"], r["text"]))
+                        r["sender"], r["text"], EMBED_MODEL, MAX_EMBED_CHARS))
             db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?,?)",
                        (rid, sqlite_vec.serialize_float32(v)))
         db.commit()

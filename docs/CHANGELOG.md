@@ -1,5 +1,200 @@
 # Twin Mind - canonical changelog
 
+## 2026-09-29 (reproducibility)
+
+The corpus can now be rebuilt from files, and 1,679 records that existed nowhere else are backed up.
+
+Reconciled every source in the live index against every candidate input file, matching on text rather than counts.
+`normalized-windowed-ctx/` is the real input tree: contacts, gchat and imessage at 100%, gcal, gmail and transcript at 96-98%.
+`normalized/twin-chat.jsonl` covered 39.7% of twin-chat.
+All 526 `meeting` records matched no file anywhere.
+So 1,679 records lived only inside vectors.db, and the jsonl tree that this repo calls "the durable copy" did not contain them: an index rebuild would have dropped them silently, and losing the file would have lost them outright.
+
+`pipeline/export_canonical_corpus.py` exports the index back to `normalized-canonical/`, one jsonl per source plus a MANIFEST.json with a per-source count and checksum.
+It reads `vec_meta` for the full untruncated text and `corpus.db` for the 26 records below the embedding floor, which exist in FTS and not in vectors, and would otherwise be dropped from the export.
+Round trip verified exactly: rebuilding FTS from the canonical tree gives 8,396 records against 8,396 live, every source matching.
+
+One bug found and fixed in the process.
+The first version deduplicated on (source, date, text) to avoid double-counting the vec/FTS merge, and that also collapsed 8 genuinely repeated gcal records, so the rebuild came out 8 short and looked broken.
+Deduplication is now applied only across the merge boundary: the export reproduces the index rather than improving it.
+
+Wired into the 15-minute timer as an ExecStartPre, so the export is regenerated before each sync rather than aging into a stale snapshot, and `corpus_sync.py --fast` now ships both trees.
+CLAUDE.md names `normalized-canonical/` as authoritative and records that rebuilding from `normalized/*.jsonl` yields 29,812 records and re-ingests the purged gmail noise.
+
+## 2026-09-29 (cost)
+
+Every gateway call had been untagged since the inference profiles were created, so "what does the twin cost" was unanswerable.
+
+Cost Explorer for September 2026 (28 days, all covered by credits, $167.52 of list-price usage): agentlab $60.22, twin-mind $4.69, and $102.75 untagged, which is 61% of the account.
+The untagged bucket is led by $83.14 of Claude Sonnet 4.6, and that is the twin.
+
+`shared/bedrock_profiles.route_model` existed and was wired into `wrap_anthropic_call`, which only patches AnthropicBedrock clients.
+The gateway uses Converse, and `agent/bedrock_adapter.build_converse_kwargs` passed the logical model id straight to the SDK with no routing at all.
+Patched it to substitute the application inference profile ARN at that one point, which is the design CLAUDE.md already specifies: keep the logical id inside Hermes so provider detection, context limits, prompt caching and streaming are unchanged, and replace only the model that reaches the SDK.
+Routing applies only to the model the profile was created for, and any failure falls through to the plain id, because a cost tag is never worth a broken turn.
+Verified with a live Converse call: modelId sent was the `r9bht745cst4` ARN, the call returned, and the gateway restarted clean.
+Like the cachePoint patch beside it, this is local to the Hermes framework and must be re-applied after any Hermes update; backup at `bedrock_adapter.py.bak-profile-1790686661`.
+
+The same read-the-env bug appeared for the third time tonight and is now handled here too: the ARN in `~/.hermes/.env` is written with apostrophes, systemd strips them when loading an EnvironmentFile but a plain file read does not, and Bedrock rejects the result as "The provided model identifier is invalid".
+
+Two cost findings recorded while looking, neither acted on yet.
+Prompt cache reads collapsed from 87.5% of input in July to 28.6% in September, and the cachePoint patch is intact, so the cause is the caveat the patch always carried: it caches the system prefix only, and the growth is in conversation history, which is never cached.
+Separately, cache WRITES are the single largest line in the account at $66.08 for 16.0M tokens against $7.50 for 22.7M reads, which is about 1.4 reads per write; caching pays only when a prefix is read many times per write.
+The implied per-token rates in that bucket look wrong and should be checked against the pricing page before anyone acts on them.
+
+Still untagged after this change: the Haiku compaction model (there is no twin-mind-haiku profile), Cohere embeddings at $5.53, and the EC2, VPC and S3 resources, which need ordinary resource tags rather than inference profiles.
+Cost Explorer lags roughly a day, so the split should be re-read on 2026-10-01.
+
+## 2026-09-29
+
+Re-embedded the whole index at one truncation, measured time-aware expansion and rejected it, and finally proved corpus-rag fires.
+
+**Truncation drift, fixed.**
+Two code paths cut long records at different lengths before embedding: the full build at 1,500 characters, every incremental writer at 2,048.
+2,808 of 8,366 vectors are over 1,500 characters and 1,749 sit in the window where the caps differ, so those records had a vector that depended on whether the 30-minute timer or a rebuild created it.
+Traced one real 1,607-character transcript through both: cosine distance 0.0055 and 1,021 of 1,024 dimensions changed.
+Small, but near-neighbours in a KNN over 8,366 vectors are routinely closer together than that, so ranking depended on provenance rather than meaning.
+`shared/embedding.py` is now the single contract (MODEL, DIM, MAX_CHARS, MIN_CHARS, BATCH, input types) and `evals/test_embedding_contract.py` greps every writer and fails if one drifts, including a test that the drift detector itself detects.
+The `model` column added the day before could never have caught this, because the model never changed; only the text did.
+
+**The rebuild nearly destroyed the index, and preflight caught it.**
+The obvious command is `python embed_corpus.py`, and it would have produced 29,812 vectors against the live index's 8,366.
+The production index was never built from `normalized/*.jsonl`: the box holds three input trees (normalized, normalized-windowed, normalized-windowed-ctx), the live index is a mix of them, and twin-chat plus meeting records exist only as timer appends and are in no input file at all.
+The glob would also have re-ingested `gmail-noise-removed-20260928.jsonl`, resurrecting the 2,415 machine-mail records purged the day before.
+There is no command that reproduces the current index, which is worth fixing separately.
+Instead `pipeline/backfill/reembed_at_2048.py` reads `vec_meta.text`, which already holds the exact untruncated text of every embedded record, since truncation only ever happened in the API call.
+Same records, same rowids, same metadata, only the numbers change.
+8,370 rows in 92 seconds over 87 Bedrock calls, resumable through a new `vec_meta.embed_chars` stamp, and every writer now sets it so the drift is visible in the data and not only in the source.
+Final state: 8,370 vec_meta, 8,370 vec_idx, aligned, all stamped 2048, parity ok.
+One wart found in its own reporting: the first run cried MISALIGNED because the ingest timer appended 4 rows during the 92 seconds and the check compared a fresh count against a stale one.
+
+**Time-aware query expansion: measured, rejected.**
+`shared/query_time.py` resolves a relative date into `--since`/`--until` using forced tool use against a reference date computed in code, gated by a regex so a question with no temporal cue costs no model call.
+It works: "one year ago" resolves to 2025-09-01..2025-09-30, "this day 3 years ago" to a single day, and on Daniel's real corpus it turned "what happened one year ago" from a 2018 group chat into four iMessages from September 2025.
+On 150 LongMemEval questions it made retrieval WORSE: 0.92 to 0.84 overall, and 0.96 to 0.88 on temporal-reasoning, the bucket it was built for.
+The cause is structural: `semantic_rows` applies date filters AFTER the KNN over a k*5 overfetch, so a range does not steer retrieval, it deletes candidates retrieval already found.
+The paper's version indexes each value by the timestamped events it contains, which is a different mechanism, so its +6.8% to +11.3% does not transfer.
+`corpus-rag` no longer passes `--time-expand`; the flag stays on the contract for an explicit "what happened in March" query.
+Ranking this change first was wrong, and only the eval caught it.
+
+**corpus-rag proven to fire.**
+Open since 2026-09-24 and unanswerable from logs. The counter now reads 9 of 9 turns injected, 0 empty, 0 errors, 100% searched.
+
+## 2026-09-28 (late)
+
+The lexical lane has never worked. One line, and it explains everything else.
+
+`corpus_search.fts_query` quoted each query token and joined them with a space.
+FTS5 reads space-separated terms as an implicit AND, so the lexical lane required every word of the question to appear in one record.
+For a natural-language question that is essentially never true.
+`--any` existed and defaulted off.
+
+Measured on LongMemEval_S, 470 labelled questions with 115k-token histories:
+
+    implicit AND (as shipped)   recall@10 = 0.00
+    explicit OR                 recall@10 = 0.84,  median rank 1.0
+
+Three symptoms that looked unrelated were this one cause.
+The only record certain to contain every word of a question is the question itself, and Daniel's own turns are in the corpus as twin-chat records, so the only match the query permitted was his own earlier phrasing.
+On eight real questions from his traces, the top hit was his own past question in six, and two returned nothing at all.
+Worse, hybrid mode scored identically to semantic alone (0.95 on both), because the lexical lane contributed nothing to the fusion.
+The 2026-07-03 bake-off that made hybrid the default was therefore comparing semantic retrieval against a BM25 lane that returned no rows.
+That verdict may still be correct but it was never actually tested.
+
+The default is now OR, with `--all` kept for the rare case where every term is genuinely required.
+BM25 still ranks, so OR is not loose: a record matching six rare terms outranks one matching a single common word.
+
+`corpus-rag` also drops hits that are just the query coming back, by token containment at 0.8, over-fetching K+4 so the filter cannot shrink the injected set.
+Verified end to end against the real corpus: "When did I get banned off hinge?" previously returned that same question, and now returns the twin's own dated answer, the iMessage thread about it, and the original Hinge email from hello@mail.hinge.co on 2026-01-20.
+
+Two problems remain, both now measurable rather than suspected.
+Temporal questions are still broken: "what happened one year ago" returns a 2018 group chat, because nothing parses a relative date into the `--since` filter that already exists.
+That matches the LongMemEval temporal-reasoning bucket at 0.82 on 127 questions, the largest category, and 10 of Daniel's 17 real corpus questions are date-anchored.
+Separately, the twin's own boilerplate is polluting retrieval: the S3 question returns two records whose text is "Corpus isn't relevant here - ignoring it", which the echo filter does not catch because they are not echoes of the query.
+
+Also built: `evals/longmemeval_retrieval.py` runs the benchmark's data through the twin's own retrieval contract at turn granularity, scoring recall from the `has_answer` turn labels.
+This needs no model calls and no OpenAI key, because retrieval recall is set membership rather than a judgement; the paper's GPT-4o judge is only needed for answer quality.
+`--per-type` exists because the benchmark file is grouped by question type, so a plain head() samples one category and calls it a benchmark, which is a mistake this made once.
+
+Attempts that failed, recorded so they are not repeated.
+Deriving a gold set from Daniel's own traces by rare-token containment produced 23 cases whose gold documents were mostly coincidence: a question about the weather matched a mock interview transcript, and a question about verbatim text three years ago matched a bank statement.
+Tightening the thresholds took it to zero cases.
+The sweep showed no setting giving both a usable count and defensible golds, because 55 unique question/answer pairs is too thin and most were not corpus questions.
+Related finding: the twin cites its source in 1 of 55 answers despite corpus-rag instructing it to, so provenance cannot currently be recovered from the answers either.
+
+## 2026-09-28 (night)
+
+Four architecture changes, in order: index parity, retrieval instrumentation, durability, and a version pin on the vector index.
+
+Three of the four exist because the system had failure modes that returned success.
+That is the thread running through all of them, and it showed up again the same evening in an unrelated place: an IMAP command that removed a Gmail label returned OK on 8,266 messages and changed nothing.
+Every change below is verified by re-reading state rather than by an exit code.
+
+**1. Index parity.**
+Retrieval is hybrid, so a record indexed for keywords but missing from the vector index is found by an exact phrase and invisible to a paraphrase.
+That already happened: twin-chat sat at 187 FTS records and 0 vectors while every keyword search worked.
+The invariant was measured against the live corpus before any alarm was written, and it is exact on all eight sources: per source, `count(FTS where length(trim(text)) >= 12) == count(vec_meta)`.
+The 12 character floor is what makes the two counts comparable at all, because `embed_corpus.load_records` and `ingest_twin_chat.embed` both skip short acks.
+`corpus_staleness.py` now runs the check before the freshness check, since a broken index is a correctness problem and a stale source is only a freshness problem.
+Both reads are read-only, so a run during an ingest reports a mismatch that clears on the next run.
+Six tests in `evals/test_corpus_parity.py`, including the real 187/0 shape and orphan vectors left by a purge.
+Live: all 8 sources fresh, index parity ok.
+
+**2. Retrieval instrumentation.**
+Whether `corpus-rag` fires had been open since 2026-09-24 and the logs were never going to settle it: the plugin logs at INFO and the gateway journals WARNING and above, so two days of logs held zero INFO lines.
+The plugin now appends one line per turn to `~/twin-corpus/rag-stats.jsonl` with the outcome and the reason, and never the message text.
+`shared/rag_stats.py` reads it, shimmed as `rag-stats`.
+The distinction that matters in that file is injected versus empty: both mean the corpus was searched, and a high empty rate is a retrieval problem rather than a plugin problem.
+Five tests, including that no message text reaches the file and that an unwritable file cannot break a live turn.
+After the gateway restart the file already answers half the question: the plugin registers, which was previously unknown.
+
+**3. Durability.**
+The corpus is 21 MB of irreplaceable data next to 761 MB of derived data, and both were on one 6-hourly schedule while ingest ran every 30 minutes.
+`corpus_sync.py --fast` now syncs `normalized/*.jsonl` every 15 minutes on its own timer; the full tree, the indexes and a snapshot of `state.db` stay on the 6-hourly one.
+The jsonl files are the only copy of what was said. An index can be rebuilt from them for one FTS rebuild and about 87 Cohere calls; they cannot be rebuilt from anything.
+`state.db` was not backed up at all before this, which left the window between a message arriving and being ingested on exactly one EBS volume.
+Worst case loss falls from 6 hours to about 45 minutes for a brand new message and 15 minutes for anything already ingested.
+The fast lane syncs one subtree to the matching subtree, because pointing `--delete` at the bucket root from a partial tree would delete the indexes from S3 and turn a durability fix into data loss.
+Verified by a dry run showing nothing left to upload.
+
+**4. Version pin.**
+`vec_meta` did not record which embedder produced a row, so after any model change there was no way to tell a re-embedded row from a stale one, and the only safe response to any change was to rebuild all of it.
+Added `vec_meta.model` and stamped all 8,300 existing rows `cohere.embed-multilingual-v3`, which is true: it is the only embedder this corpus has used.
+All five writers now name their columns instead of relying on position, which also means the old 7-value statement fails loudly rather than misaligning silently.
+This is a prerequisite for the contextual-headers change, which has to re-embed everything once and currently would leave an unreadable index if it died halfway.
+
+Still open, in order: the eval set (30 to 50 questions), then contextual headers, time-aware query expansion and a consolidation layer, none of which should be attempted before there is a number they are supposed to move.
+
+## 2026-09-28 (evening)
+
+Unsubscribed from 38 scheduled senders, and published the pipeline as an interactive page.
+
+The rule Daniel set is event-driven versus scheduled, not sender versus sender.
+An order confirmation from Thuisbezorgd is wanted and the Thuisbezorgd newsletter is not, so turning off the domain would lose both.
+They separate in the headers, which is why this works at the address level: a bulk sender must offer `List-Unsubscribe`, and transactional mail carries none because there is nothing to unsubscribe from.
+`newsletter@update.thuisbezorgd.nl` was in the candidate set and the order-tracking address was not, without anyone having to classify them by hand.
+
+`shared/email_unsubscribe.py` reads the census, drops anything matching the PROTECT pattern (Ashby, Greenhouse, Lever, Workday, bank, LinkedIn direct messages, mailer-daemon, and any address containing order, invoice, shipping, tracking, receipt or security), and classifies what remains by unsubscribe mechanism.
+Only RFC 8058 one-click is automated: the sender advertises `List-Unsubscribe-Post: List-Unsubscribe=One-Click` and a single POST ends the subscription, with no browser and no rendered page.
+Ordinary unsubscribe URLs are printed and never followed, because some exist only to confirm a live address.
+The mailbox is opened read-only and fetched with BODY.PEEK throughout; the POSTs are the only writes.
+
+40 of 45 candidates supported one-click and 38 succeeded.
+Two failures remain: `noreply@news.bloomberg.com` and `noreply@medium.com` both return HTTP 403 to a non-browser POST, covering 588 messages, and need a human click or a provider-side filter.
+One earlier failure was our own: RFC 5322 folds a long `List-Unsubscribe` URL across lines and the continuation whitespace ended up inside the URL, so urllib refused it with "URL can't contain control characters".
+`clean()` now strips it, which is exact rather than a guess because a URL has no legal whitespace, and LinkedIn's newsletter stream unsubscribed on the retry.
+Eneba returned 404 on the second run because its token was spent by the first; re-running the batch is otherwise safe.
+
+Five senders carry no `List-Unsubscribe` header at all and are untouched: Steam, metalshop, Songkick, SoundCloud and G2A.
+They need a provider-side filter, not an unsubscribe.
+The 9,567 messages already sitting in the mailbox are also untouched.
+Unsubscribing stops the arrival of new mail and does nothing about the backlog, which is a separate label-and-archive job, never a delete.
+
+Published `Twin Mind Pipeline` (https://claude.ai/artifact/Cw4AM7Yh6Vx1DXyAu4W6TY): the 16 stages from a received message to a grounded answer, each with the code that actually runs and, where one exists, the proposed change beside what is live.
+Record counts on the page were read from the box rather than recalled: 8,295 FTS records, 8,271 vectors, 8 sources, 13 timers.
+It also carries a retrieval simulator, with real BM25 and a clearly labelled stand-in for the vector lane, and an append-versus-rebuild simulator built to settle a question Daniel asked three times.
+The answer that page exists to make obvious: a vector is a function of one record's text alone, so appending record 8,296 cannot invalidate record 1, and a rebuild is required only when the embedded string changes or the model changes.
+
 ## 2026-09-28 (later)
 
 Rebuilt twin-chat from state.db and cut the machine mail out of the corpus.

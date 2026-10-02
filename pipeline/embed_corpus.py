@@ -20,7 +20,15 @@ ROOT = os.environ.get("TWIN_CORPUS", os.path.expanduser("~/twin-corpus"))
 DB = os.path.join(ROOT, "index", "vectors.db")
 MODEL = "cohere.embed-multilingual-v3"
 BATCH = 96          # Cohere max texts per call
-MAXCH = 1500        # truncate long records (emails)
+# The shared cap. It was 1500 here and 2048 in every incremental writer, so a
+# record over 1500 chars got a different vector depending on how it arrived.
+# See shared/embedding.py for the measurement.
+try:
+    from shared.embedding import MAX_CHARS as MAXCH
+except ImportError:  # running as a script from pipeline/
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from shared.embedding import MAX_CHARS as MAXCH
 
 brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
 
@@ -68,9 +76,9 @@ def embed_only(meeting):
             vecs = embed([r["text"] for r in chunk])
         for r, v in zip(chunk, vecs):
             rid += 1; n += 1
-            db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
+            db.execute("INSERT INTO vec_meta (rowid, source, chat, date, who, sender, text, model, embed_chars) VALUES (?,?,?,?,?,?,?,?,?)",
                        (rid, r.get("source", ""), meeting, r.get("date", ""),
-                        r.get("who", ""), r.get("sender", ""), r.get("text", "")))
+                        r.get("who", ""), r.get("sender", ""), r.get("text", ""), MODEL, maxch))
             db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?, ?)",
                        (rid, sqlite_vec.serialize_float32(v)))
     db.commit()
@@ -101,8 +109,11 @@ def build(records, out_db=DB, maxch=MAXCH):
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
+    # `model` records which embedder produced the row. Without it there is no
+    # way to tell a re-embedded row from a stale one after a model change, so
+    # the only safe response to any change would be to rebuild everything.
     db.execute("CREATE TABLE vec_meta(rowid INTEGER PRIMARY KEY, source TEXT, "
-               "chat TEXT, date TEXT, who TEXT, sender TEXT, text TEXT)")
+               "chat TEXT, date TEXT, who TEXT, sender TEXT, text TEXT, model TEXT, embed_chars INTEGER)")
     db.execute("CREATE VIRTUAL TABLE vec_idx USING vec0(embedding float[1024])")
 
     n = 0
@@ -115,10 +126,10 @@ def build(records, out_db=DB, maxch=MAXCH):
             vecs = embed([r["text"] for r in chunk], maxch=maxch)
         for r, v in zip(chunk, vecs):
             n += 1
-            db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
+            db.execute("INSERT INTO vec_meta (rowid, source, chat, date, who, sender, text, model, embed_chars) VALUES (?,?,?,?,?,?,?,?,?)",
                        (n, r.get("source", ""), r.get("chat", r.get("meeting", "")),
                         r.get("date", ""), r.get("who", ""), r.get("sender", ""),
-                        r.get("text", "")))
+                        r.get("text", ""), MODEL, maxch))
             db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?, ?)",
                        (n, sqlite_vec.serialize_float32(v)))
         if (i // BATCH) % 20 == 0:
@@ -140,7 +151,7 @@ if __name__ == "__main__":
     ap.add_argument("--only", default="", help="incrementally embed ONE meeting (by its stem) into the existing db, no rebuild")
     ap.add_argument("--inputs", nargs="+", help="explicit jsonl paths to embed (instead of normalized/*.jsonl); pairs with --out")
     ap.add_argument("--out", default=DB, help="output vectors db path (default: index/vectors.db)")
-    ap.add_argument("--maxch", type=int, default=MAXCH, help="per-record char cap before embedding (default 1500)")
+    ap.add_argument("--maxch", type=int, default=MAXCH, help="per-record char cap before embedding (default: shared/embedding.MAX_CHARS)")
     a = ap.parse_args()
     if a.only:
         embed_only(a.only)

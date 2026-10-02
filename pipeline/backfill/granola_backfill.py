@@ -23,6 +23,9 @@ FTS_DB = os.path.join(CORPUS, "index", "corpus.db")
 VEC_DB = os.path.join(CORPUS, "index", "vectors.db")
 JSONL = os.path.join(CORPUS, "normalized", "transcripts.jsonl")
 EMBED_MODEL = "cohere.embed-multilingual-v3"
+# Must equal shared/embedding.MAX_CHARS. Pinned by evals/test_embedding_contract.py,
+# which fails if any writer drifts.
+MAX_EMBED_CHARS = 2048
 SOURCE = "transcript"
 CHUNK = 1800
 
@@ -103,7 +106,7 @@ def main():
     brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
     vecs = []
     for i in range(0, len(recs), 90):
-        body = json.dumps({"texts": [r["text"][:2048] for r in recs[i:i + 90]],
+        body = json.dumps({"texts": [r["text"][:MAX_EMBED_CHARS] for r in recs[i:i + 90]],
                            "input_type": "search_document", "truncate": "END"})
         vecs += json.loads(brt.invoke_model(modelId=EMBED_MODEL, body=body)["body"].read())["embeddings"]
     db = sqlite3.connect(VEC_DB)
@@ -111,8 +114,8 @@ def main():
     rid = db.execute("SELECT COALESCE(MAX(rowid),0) FROM vec_meta").fetchone()[0]
     for r, v in zip(recs, vecs):
         rid += 1
-        db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
-                   (rid, r["source"], r["chat"], r["date"], r["who"], r["sender"], r["text"]))
+        db.execute("INSERT INTO vec_meta (rowid, source, chat, date, who, sender, text, model, embed_chars) VALUES (?,?,?,?,?,?,?,?,?)",
+                   (rid, r["source"], r["chat"], r["date"], r["who"], r["sender"], r["text"], EMBED_MODEL, MAX_EMBED_CHARS))
         db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?,?)",
                    (rid, sqlite_vec.serialize_float32(v)))
     db.commit(); db.close()

@@ -22,6 +22,7 @@ Run with --dry-run to see what it would take without writing.
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -33,8 +34,29 @@ VEC_DB = os.path.join(CORPUS, "index", "vectors.db")
 JSONL = os.path.join(CORPUS, "normalized", "twin-chat.jsonl")
 LEGACY_DONE = os.path.join(CORPUS, "normalized", ".twin-chat-ingested")
 EMBED_MODEL = "cohere.embed-multilingual-v3"
+# Must equal shared/embedding.MAX_CHARS. Pinned by evals/test_embedding_contract.py,
+# which fails if any writer drifts.
+MAX_EMBED_CHARS = 2048
 SOURCE = "twin-chat"
 MIN_EMBED_CHARS = 12
+
+# The twin's own scaffolding is not something anyone said. When corpus-rag
+# injects context that turns out to be irrelevant, the model says so out loud,
+# and that sentence was then ingested as a corpus record. Those records rank
+# highly on exactly the questions that ask about the system, because they carry
+# its vocabulary: on 2026-09-28 the query "what did we decide about moving the
+# corpus to s3" returned two of them in its top five.
+#
+# Only 37 records, 1.9% of twin-chat, so this is precision rather than volume.
+# The pattern is anchored to the opening of the message because the phrase only
+# means boilerplate when the message BEGINS with it; quoting it mid-answer is a
+# real answer about how the system behaves.
+TWIN_BOILERPLATE = re.compile(
+    r"^\W*(the )?corpus( context)? (is\s+not|is\s?n'?t|was\s+not|was\s?n'?t)\s+relevant", re.I)
+
+
+def is_boilerplate(role: str, text: str) -> bool:
+    return role == "assistant" and bool(TWIN_BOILERPLATE.match((text or "").strip()))
 
 
 def ensure_ledger(fts):
@@ -79,6 +101,8 @@ def pending(state, fts):
         # Tool calls and system turns are not things anyone said.
         if role not in ("user", "assistant") or not text:
             continue
+        if is_boilerplate(role, text):
+            continue
         try:
             date = datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
         except (TypeError, ValueError):
@@ -102,7 +126,7 @@ def embed(records):
     brt = boto3.client("bedrock-runtime", region_name="eu-west-1")
     vecs = []
     for i in range(0, len(worth), 90):  # Cohere v3 takes up to 96 texts per call
-        body = json.dumps({"texts": [r["text"][:2048] for r in worth[i:i + 90]],
+        body = json.dumps({"texts": [r["text"][:MAX_EMBED_CHARS] for r in worth[i:i + 90]],
                            "input_type": "search_document", "truncate": "END"})
         vecs += json.loads(brt.invoke_model(modelId=EMBED_MODEL, body=body)["body"].read())["embeddings"]
     db = sqlite3.connect(VEC_DB, timeout=30)
@@ -111,8 +135,8 @@ def embed(records):
         rid = db.execute("SELECT COALESCE(MAX(rowid),0) FROM vec_meta").fetchone()[0]
         for r, v in zip(worth, vecs):
             rid += 1
-            db.execute("INSERT INTO vec_meta VALUES (?,?,?,?,?,?,?)",
-                       (rid, r["source"], r["chat"], r["date"], r["who"], r["sender"], r["text"]))
+            db.execute("INSERT INTO vec_meta (rowid, source, chat, date, who, sender, text, model, embed_chars) VALUES (?,?,?,?,?,?,?,?,?)",
+                       (rid, r["source"], r["chat"], r["date"], r["who"], r["sender"], r["text"], EMBED_MODEL, MAX_EMBED_CHARS))
             db.execute("INSERT INTO vec_idx(rowid, embedding) VALUES (?,?)",
                        (rid, sqlite_vec.serialize_float32(v)))
         db.commit()
