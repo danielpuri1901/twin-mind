@@ -27,7 +27,7 @@ def test_build_and_search():
         assert rows == [("gurobi presolve trick",)], rows
 
         out = subprocess.run(
-            [sys.executable, os.path.join(TOOLS, "corpus_search.py"), "gurobi", "--k", "5"],
+            [sys.executable, os.path.join(TOOLS, "..", "shared", "corpus_search.py"), "gurobi", "--k", "5", "--mode", "lexical"],
             check=True, env=env, capture_output=True, text=True).stdout.strip()
         hit = json.loads(out)
         assert hit["text"] == "gurobi presolve trick" and hit["who"] == "me", hit
