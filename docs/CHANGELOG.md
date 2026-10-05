@@ -21,6 +21,11 @@ Two tests that expected the raise now expect the withheld line.
 Four new tests cover the spacing case, spacing between words, one bad item among good ones, and an unknown source id.
 This morning's real `brief.compose` trace was replayed locally through `render()`: the deployed version raises the same error, and the fixed version renders all five items.
 
+Deployed the same morning, checksum verified on the box. The previous file is kept there as `compose_brief.py.bak-20261005`.
+A no-send dry run of the deployed code on the live inbox, with tracing off, exited 0 and rendered six items: three verified and three marked "Quote not verified".
+Before this fix, any one of those three would have dropped the whole brief.
+Three of six is a high rate for quotes the prompt asks to copy exactly, so the next step is to find out why they differ, and then to consider a retry that feeds the failed quote back into the structured call.
+
 The inbox cursor moves only after a successful send, so a failed morning makes the next run read the same window again.
 
 ## 2026-10-02
