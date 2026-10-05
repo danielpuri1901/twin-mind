@@ -12,7 +12,9 @@ It runs as one standalone page with no server setup.
 
 ## What it does
 
-- **Morning brief:** Produces one daily email from calendar events, inbox signals, weather, recent AI work, project activity.
+- **Morning brief:** Produces one daily email from calendar events, inbox signals, weather, recent AI work, and project activity.
+  Action items require source evidence and an explicit state.
+  Unread flags do not establish urgency or completion.
 - **Background prep:** Creates a short dossier before professional meetings.
 - **Interactive chat:** Grounds Telegram replies in a private personal corpus.
 - **Weekly recap:** Collects build progress, the week's meetings, and personal reflection into one review.
@@ -46,9 +48,14 @@ Structured model responses use schemas instead of text parsing.
 
 ## Memory
 
-Raw personal data stays encrypted on the local machine.
-Only a derived working set reaches the private AWS host through SSM.
-No corpus data belongs in Git, S3, logs, third-party datasets.
+The private AWS host holds the canonical working corpus.
+Raw archives and derived corpus data are backed up to private S3 storage under the current storage policy.
+The policy requires a customer-managed encryption key, versioning, blocked public access, access logging, and restricted bucket access.
+Personal corpus records do not belong in the public code repository.
+
+The canonical export includes a manifest of source counts and checksums.
+Indexes are derived from that export.
+The twin's conversations are ingested on a timer, so memory does not depend on a session ending.
 
 All corpus access uses one command:
 
