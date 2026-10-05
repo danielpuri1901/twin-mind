@@ -18,11 +18,15 @@ FORMAT CONTRACT (machine-checked at 07:50 - the rendering is not a creative choi
 Sections, in order:
 1. NEEDS YOU TODAY - one line per item: who / what / why now. NO ready-to-send drafts (Daniel's
    ruling 2026-07-14: volume doesn't justify them; he asks on Telegram when he wants one).
-   Deciding what matters: the state flags are facts - trust them. REPLIED-ALREADY means the ball
-   left Daniel's court; UNREAD + KNOWN + a question usually matters; deadlines and money always
-   surface. Latest-state check still applies: newest evidence wins; a reply that confirms a plan
-   closes the loop; never nudge someone who already answered. Ambiguity = pose a question, never
-   an action.
+   Bind each relevant item to its source and quote the explicit request or update with its date.
+   Separate confirmed action (request received, completion unknown), waiting on someone, and status unknown.
+   UNREAD, STARRED, IMPORTANT, and KNOWN are attention hints, never proof of unfinished or unacknowledged work.
+   REPLIED-ALREADY is a subject-match hint, not verified full-thread state.
+   An invitation establishes an invitation, never attendance or a missed call.
+   Do not invent a deadline or urgency from message age or flags.
+   Preserve explicit requests and dates.
+   Newest evidence wins; a reply that confirms a plan closes the loop.
+   Ambiguity stays unknown, never an obligation.
 2. TODAY - the weather line first (as provided), then calendar events with their provided times.
    Nothing else.
 3. AI ADVANCEMENTS (2-3 items) - insights, not headlines; breadth across the AI world welcome
@@ -37,8 +41,9 @@ Sections, in order:
    Format: concept in 3-4 sentences, the EXACT code in this system (read the real file, quote
    path + lines), ONE quiz question, then its answer on the next line as `Answer: ...`. Never
    skip the answer.
-5. COACH (1 item) - one nudge, spaced-repetition style: resurface if unacknowledged, else one new
-   observation grounded in concrete corpus evidence. No platitudes.
+5. COACH (1 item) - one neutral reminder to confirm current status before acting on an older request.
+   Never infer acknowledgement from read state or editorialize about Daniel's timeline or use of time.
+   The composer currently renders this reminder in code; unchecked model coaching is not delivered.
    GROUNDING (hard rule, 2026-07-16 after a hallucination): every claim about Daniel's CURRENT
    situation must be a dated, verifiable fact. The corpus holds PLANS, proposals and experiments
    that were later changed or cancelled - NEVER present one as if it is happening now (the brief

@@ -23,10 +23,11 @@ grader). Run with --dry-run to compose + print without sending.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))   # tools->brief->agents->super-project
@@ -50,6 +51,9 @@ class NeedsItem(BaseModel):
     who: str        # the person / source
     what: str       # what it is, one line
     why_now: str    # why it needs Daniel today
+    source_id: str
+    evidence_quote: str  # exact source body or subject, never Gmail flags
+    state: Literal["confirmed_action", "waiting_on_someone", "unknown"]
 
 
 class TechnicalThing(BaseModel):
@@ -114,10 +118,15 @@ SYS = (
     "- needs_you_today: judge which inbox items need a DECISION from Daniel today. Every item now carries "
     "a body snippet - READ IT; the subject alone hides the real ask (an interview take-home, a recruiter "
     "reply that looks like a stale calendar invite). The inbox is now UNFILTERED, so obvious "
-    "marketing/newsletters appear - do NOT surface those. Flags are facts: REPLIED-ALREADY means the ball "
-    "left his court (skip); anything Gmail marked STARRED or IMPORTANT surfaces unless the body is clearly "
-    "stale; an UNREAD email from a real person, a question, a deadline, or money surfaces; newest evidence "
-    "wins. Empty list if nothing needs him. No ready-to-send drafts.\n"
+    "marketing/newsletters appear - do NOT surface those. For each relevant item copy source_id and an "
+    "exact evidence_quote from its body or subject. Classify an explicit request as confirmed_action, "
+    "an explicit promise of someone else's next step as waiting_on_someone, otherwise unknown. "
+    "Confirmed action means a request was received, not that it remains unfinished. Gmail flags are "
+    "attention hints only: UNREAD/STARRED/IMPORTANT never prove completion or acknowledgement. "
+    "REPLIED-ALREADY is a subject-match hint, not full-thread state. An invitation proves an invitation, "
+    "never attendance or a missed call. Do not invent deadlines or urgency. Preserve explicit source "
+    "requests and dates in the quote; unknown completion stays unknown. Newest evidence wins. "
+    "Empty list if nothing relevant. No ready-to-send drafts.\n"
     "- ai_advancements: 2-3 INSIGHT items drawn ONLY from the RECENT AI NEWS block. Pick the most "
     "substantive advances (model releases, research results, real developer tools) and IGNORE stock, "
     "marketing, funding, or off-topic items. Do NOT use anything outside the block, and NEVER invent a "
@@ -132,7 +141,8 @@ SYS = (
     "technical_thing = null when the block says there are no fresh candidates.\n"
     "- coach: ONE grounded nudge. GROUNDING (hard rule): only state a fact about Daniel that is dated "
     "and present in these inputs; never claim what the system 'is doing now' unless it is in the inputs; "
-    "if you have no verifiable current fact, coach from a stable value. No platitudes.\n"
+    "if you have no verifiable current fact, coach from a stable value. Never editorialize about "
+    "Daniel's timeline, empty calendar, or how he spends time. No platitudes.\n"
     "Plain hyphens only, never an em dash. No emoji."
 )
 
@@ -160,7 +170,8 @@ def build_user(facts):
         f"\n=== RECENT AI NEWS (the ONLY source for AI ADVANCEMENTS - cite from these; if empty, keep it short) ===\n{facts['ai_news'] or '(no items fetched today)'}",
         f"\n=== TECHNICAL CANDIDATES (used source events removed; choose at most one) ===\n"
         f"{format_technical_candidates(facts['technical_candidates'])}",
-        f"\n=== INBOX ({facts['reviewed_count']} emails, state-annotated) ===\n{facts['inbox_text']}",
+        f"\n=== INBOX ({facts['reviewed_count']} emails; flags do not establish task status) ===\n"
+        + "\n".join(f"SOURCE_ID: {source_id}\n{source['raw']}" for source_id, source in inbox_sources(facts).items()),
         f"\n=== ALSO (already rendered by code, for your awareness) ===\nWeather: {facts['weather']}\n"
         f"Calendar:\n" + "\n".join(facts["calendar_lines"]),
     ])
@@ -218,19 +229,76 @@ def compose_with_technical_gate(facts):
 
 # ---------- deterministic render (format is code, not a creative choice) ----------
 
+def inbox_sources(facts):
+    """Bind local IDs to the existing prefetch rows, excluding flags from evidence."""
+    sources = {}
+    pattern = r"^- \[[^\]]*\] ([^|]+)\| ([^|]+)\| ([^\n]+)((?:\n    [^\n]*)*)"
+    for index, match in enumerate(re.finditer(pattern, facts.get("inbox_text", ""), re.M), 1):
+        date, sender, subject, body = (part.strip() for part in match.groups())
+        sources[f"inbox-{index}"] = {"date": date, "sender": sender, "subject": subject,
+                                      "body": body, "raw": match.group()}
+    return sources
+
+
+def _canon(text):
+    """Ignore whitespace next to punctuation, nothing else.
+
+    HTML stripping turns "<b>today</b>." into "today ." and the model quotes it as "today."
+    (2026-10-05, the first morning this check ran: no brief was sent). Spaces between two
+    words still have to match, so "the rapist" never grounds against "therapist".
+    """
+    return re.sub(r"\s*([^\w\s])\s*", r"\1", " ".join(text.split()))
+
+
+def grounded_inbox_lines(brief, facts):
+    """Render only source text. Model-written status claims and urgency never reach email.
+
+    An item that fails the check is withheld, never fatal: one bad quote used to raise and drop
+    the whole brief. A withheld item shows the source's own sender and subject, so a real email
+    still reaches Daniel; the model's quote does not.
+    """
+    sources = inbox_sources(facts)
+    lines = []
+    for item in brief.needs_you_today:
+        source = sources.get(item.source_id)
+        quote = " ".join(item.evidence_quote.split())
+        if source is None:
+            lines.append("- Withheld: an item cited an email that is not in this inbox snapshot")
+            continue
+        if not quote or not any(_canon(quote) in _canon(source[field]) for field in ("body", "subject")):
+            lines.append(f"- Quote not verified, open the email - {source['sender']} "
+                         f"({source['date']}): {source['subject']}")
+            continue
+        # These labels confirm source language only, never whether Daniel acted later.
+        state = "Status unknown"
+        if item.state == "confirmed_action" and re.search(
+            r"\b(?:please|can you|could you|would you|need you to)\b", quote, re.I
+        ):
+            state = "Confirmed action (request received; completion unknown)"
+        elif item.state == "waiting_on_someone" and re.search(
+            r"\b(?:I am waiting|I'm waiting|I will|I'll|we will|we'll)\b", quote, re.I
+        ):
+            state = "Waiting on someone (source says)"
+        lines.append(f"- {state} - {source['sender']} ({source['date']}): {quote}")
+    return lines
+
+
 def render(brief, facts):
-    L = [DIV, "NEEDS YOU TODAY", DIV]
+    L = [DIV, "NEEDS YOU TODAY", DIV,
+         "Inbox snapshot only. Status is not a deadline. Completion and attendance need confirmation."]
     if brief.needs_you_today:
-        L += [f"- {it.who}: {it.what} - {it.why_now}" for it in brief.needs_you_today]
+        L += grounded_inbox_lines(brief, facts)
     else:
-        L.append("- Nothing needs a decision from you today.")
+        L.append("- No requests identified in this inbox snapshot.")
     L += ["", DIV, "TODAY", DIV, facts["weather"], *facts["calendar_lines"]]
     L += ["", DIV, "AI ADVANCEMENTS", DIV] + [f"- {a}" for a in brief.ai_advancements]
     t = brief.technical_thing
     if t is not None:
         L += ["", DIV, "ONE TECHNICAL THING", DIV, f"From project: {t.project}", t.concept]
         L += ["", f"Q: {t.quiz}", f"Answer: {t.answer}"]
-    L += ["", DIV, "COACH", DIV, brief.coach]
+    # The partial inbox cannot establish attendance, completion, or how Daniel spent time.
+    # Keep coaching neutral until those claims have a source-bound evidence contract too.
+    L += ["", DIV, "COACH", DIV, "Check current status before acting on an older request."]
     L += ["", facts["reviewed_line"]]
     return "\n".join(L)
 

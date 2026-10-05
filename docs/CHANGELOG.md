@@ -1,5 +1,28 @@
 # Twin Mind - canonical changelog
 
+## 2026-10-05
+
+The morning brief was not sent on the first morning that the new inbox grounding check ran.
+
+The check was written on 2026-10-04 and deployed to the box that evening, before it was committed.
+It binds each NEEDS YOU TODAY item to one source email and requires the model's evidence quote to appear verbatim in that email.
+At 07:30 the model quoted an HTML-only email as "today." while the stripped source read "today .".
+`prefetch.snippet` replaces every HTML tag with a space, so a bold word followed by a period gains a space before the period.
+One mismatched quote raised `ValueError`, and the raise dropped the whole brief.
+The other four items passed, but no email, cursor update or heartbeat followed.
+The 07:50 watchdog reported the missing brief on Telegram.
+
+Two changes, both in `grounded_inbox_lines`:
+
+- The comparison ignores whitespace next to punctuation and nothing else. Spacing between two words still has to match.
+- An item that fails is withheld, not fatal. It renders the source email's own sender, date and subject after "Quote not verified, open the email", so a real email still reaches Daniel and the model's text does not. An item that cites a source id that does not exist renders as withheld, with no source text.
+
+Two tests that expected the raise now expect the withheld line.
+Four new tests cover the spacing case, spacing between words, one bad item among good ones, and an unknown source id.
+This morning's real `brief.compose` trace was replayed locally through `render()`: the deployed version raises the same error, and the fixed version renders all five items.
+
+The inbox cursor moves only after a successful send, so a failed morning makes the next run read the same window again.
+
 ## 2026-10-02
 
 Nine commits pushed to the public remote, with the account identifiers taken out of history first.
