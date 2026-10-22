@@ -10,6 +10,7 @@ Claude inference moved from Bedrock to the Anthropic API, on Daniel's instructio
 - Hermes: `infra/hermes-plugins/anthropic-key` exports the key into the gateway environment at startup; `infra/box-config.yaml` sets provider `anthropic`, default `claude-sonnet-4-6`, compression `claude-haiku-4-5`. The `bedrock-profiles` plugin, `shared/bedrock_profiles.py`, its test and `TWIN_BEDROCK_PROFILE_ARN` are gone.
 - The box role needs `secretsmanager:GetSecretValue` on the secret: `infra/anthropic-key-policy.json`, applied with `aws iam put-role-policy --role-name twin-mind-role --policy-name anthropic-key`.
 - Ship gate on the Mac: GREEN, the regression suite ran 9 of 9 through the Anthropic API.
+- Box cutover 18:44: the first restart failed with `No Anthropic credentials found` because Hermes skips a plugin directory without a `plugin.yaml` manifest; the manifest was added, the gateway restarted, and `hermes chat -q` answered through the Anthropic API. Two cron jobs failed in between (17:47 and 18:17).
 
 ## 2026-10-05
 

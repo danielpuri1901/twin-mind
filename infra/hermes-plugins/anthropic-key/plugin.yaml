@@ -1,0 +1,5 @@
+name: anthropic-key
+version: "0.1.0"
+description: "Export ANTHROPIC_API_KEY into the gateway environment at startup, read from AWS Secrets Manager (aws-inference) through the box role. Hermes skips a plugin directory without this manifest."
+author: twin-mind
+hooks: []
