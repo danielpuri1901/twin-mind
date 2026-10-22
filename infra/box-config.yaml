@@ -3,12 +3,15 @@
 #   terminal.backend: docker  (the sandbox the Mac couldn't have - plan Task 12)
 #   stt.enabled: false        (2GB box can't run local whisper; voice transcription
 #                              returns when a Groq key is added: stt.provider: groq)
+# Inference: the Anthropic API since 2026-10-22; the anthropic-key plugin supplies
+# ANTHROPIC_API_KEY from AWS Secrets Manager at startup. Embeddings stay on Bedrock.
 model:
-  default: eu.anthropic.claude-sonnet-4-6
-  provider: bedrock
-  base_url: https://bedrock-runtime.eu-west-1.amazonaws.com
-bedrock:
-  region: eu-west-1
+  default: claude-sonnet-4-6
+  provider: anthropic
+auxiliary:
+  compression:
+    model: claude-haiku-4-5
+    provider: anthropic
 approvals:
   mode: manual
   cron_mode: deny
@@ -22,7 +25,7 @@ web:
   extract_backend: firecrawl
 plugins:
   enabled:
-    - bedrock-profiles
+    - anthropic-key
     - observability/langfuse
   disabled: []
 mcp_servers:

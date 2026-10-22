@@ -29,7 +29,8 @@ flowchart TB
     end
 
     subgraph CLOUD["🧠 Managed services"]
-        BEDROCK["AWS Bedrock<br/>Claude (EU profiles) · Cohere embed · Amazon rerank"]
+        ANTHROPIC["Anthropic API<br/>Claude (Sonnet 4.6 drafting, Haiku 4.5 compression)"]
+        BEDROCK["AWS Bedrock<br/>Cohere embed · Amazon rerank"]
         LANGFUSE["Langfuse Cloud<br/>traces + evals mirror"]
     end
 
@@ -40,7 +41,8 @@ flowchart TB
 
     PREP -->|"derived data only, over SSM"| DERIVED
     REPO -->|"one-way skill sync (repo -> box)"| HERMES
-    AGENTS -->|inference| BEDROCK
+    AGENTS -->|inference| ANTHROPIC
+    AGENTS -->|embeddings| BEDROCK
     AGENTS -->|traces/scores| LANGFUSE
     AGENTS <--> TG
     AGENTS --> GMAIL
@@ -51,7 +53,7 @@ flowchart TB
     classDef chan fill:#fce8e6,stroke:#ea4335,color:#000
     class MAC,RAW,PREP,REPO mac
     class BOX,HERMES,DERIVED,AGENTS box
-    class CLOUD,BEDROCK,LANGFUSE cloud
+    class CLOUD,ANTHROPIC,BEDROCK,LANGFUSE cloud
     class CHAN,TG,GMAIL chan
 ```
 
@@ -138,7 +140,7 @@ flowchart TB
 
 ## 4. The agents (what runs, when)
 
-Four agents on the Hermes runtime, each a folder under `agents/`. All read the corpus through `corpus-search`; all inference via Bedrock.
+Four agents on the Hermes runtime, each a folder under `agents/`. All read the corpus through `corpus-search`; all Claude inference via the Anthropic API (shared/claude.py), embeddings via Bedrock.
 
 ```mermaid
 flowchart TB
@@ -151,7 +153,7 @@ flowchart TB
     end
 
     CORPUS["corpus-search (hybrid retrieval)"]
-    BED["Bedrock (Claude)"]
+    BED["Anthropic API (Claude)"]
     TG["Telegram"]
     MAIL["Gmail SMTP"]
 
@@ -273,7 +275,7 @@ flowchart LR
 |---|---|
 | Box | EC2 `i-0123456789abcdef0`, t4g.small, eu-west-1, zero-inbound, SSM-only, role `twin-mind-role` |
 | Agent framework | Hermes (Nous Research) - memory, skills, cron, MCP |
-| Inference | Bedrock: Claude EU profiles (Sonnet drafting / Haiku triage), Cohere embed-multilingual-v3, Amazon rerank (eu-central-1) |
+| Inference | Anthropic API since 2026-10-22: Claude Sonnet 4.6 drafting, Haiku 4.5 compression; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |
 | Retrieval | Hybrid (FTS5 + sqlite-vec + RRF) via `corpus-search`; windowed + contextual chunks (promoted 2026-07-21) |
 | Observability | Langfuse Cloud (free tier); Braintrust for experiments |
 | Channels | Telegram Bot API (interactive), Gmail SMTP (brief + recap, send-only, recipient-locked) |

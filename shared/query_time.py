@@ -110,7 +110,7 @@ def extract_range(question: str, today: Optional[date] = None, model: Optional[s
         return None, None
     today = today or date.today()
     try:
-        from shared.bedrock_profiles import MODEL
+        from shared.claude import MODEL
         from shared.structured import structured_call
         user = (f"Today is {today.isoformat()} ({today.strftime('%A')}).\n\n"
                 f"Question: {question}")

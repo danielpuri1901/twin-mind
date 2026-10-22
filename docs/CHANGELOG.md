@@ -1,5 +1,16 @@
 # Twin Mind - canonical changelog
 
+## 2026-10-22
+
+Claude inference moved from Bedrock to the Anthropic API, on Daniel's instruction, so inference runs on Anthropic API credits and AWS credits pay for infrastructure only.
+
+- `shared/claude.py` is the one client: `MODEL = claude-sonnet-4-6`, the key from `ANTHROPIC_API_KEY` or else the Secrets Manager secret `aws-inference` (shared with AgentLab), read at runtime and never written to disk.
+- `shared/structured.py` keeps its contract (forced tool use, Pydantic validation, error fed back, raise after the retries) on `client.messages.create` with `tool_choice` and a `tool_result` marked `is_error`.
+- The weekly recap and the evals (brief bench, regression, retrieval judge, generation eval, judges, intent cases) call the same client; Cohere embeddings and the rerank stay on Bedrock.
+- Hermes: `infra/hermes-plugins/anthropic-key` exports the key into the gateway environment at startup; `infra/box-config.yaml` sets provider `anthropic`, default `claude-sonnet-4-6`, compression `claude-haiku-4-5`. The `bedrock-profiles` plugin, `shared/bedrock_profiles.py`, its test and `TWIN_BEDROCK_PROFILE_ARN` are gone.
+- The box role needs `secretsmanager:GetSecretValue` on the secret: `infra/anthropic-key-policy.json`, applied with `aws iam put-role-policy --role-name twin-mind-role --policy-name anthropic-key`.
+- Ship gate on the Mac: GREEN, the regression suite ran 9 of 9 through the Anthropic API.
+
 ## 2026-10-05
 
 The morning brief was not sent on the first morning that the new inbox grounding check ran.
