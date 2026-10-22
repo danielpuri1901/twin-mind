@@ -32,7 +32,7 @@ for line in open(os.path.expanduser("~/.hermes/.env"), encoding="utf-8"):
         os.environ.setdefault(k, v)
 
 PROJECT = "twin-mind"
-GEN_MODEL = "eu.anthropic.claude-sonnet-4-6"   # the generator under test (production drafting model)
+GEN_MODEL = "claude-sonnet-4-6"   # the generator under test (production drafting model)
 CTX_DB = os.path.join(RE.ROOT, "index", "vectors-windowed-ctx.db")   # the winning retrieval config
 K = 10
 
@@ -46,23 +46,14 @@ GEN_SYS = ("Answer the question using ONLY the provided context. If the context 
 def generate(question, chunks):
     ctx = "\n\n".join(f"[{c.get('source','')} {c.get('date','')} {c.get('chat','')}] {c.get('text','')}"
                       for c in chunks)
-    r = RE.brt.converse(
-        modelId=GEN_MODEL,
-        messages=[{"role": "user", "content": [{"text": f"CONTEXT:\n{ctx}\n\nQUESTION: {question}"}]}],
-        system=[{"text": GEN_SYS}],
-        inferenceConfig={"temperature": 0, "maxTokens": 300})
-    return r["output"]["message"]["content"][0]["text"].strip()
+    return RE.claude_text(GEN_MODEL, GEN_SYS, f"CONTEXT:\n{ctx}\n\nQUESTION: {question}",
+                          max_tokens=300, temperature=0).strip()
 
 
 # ---------- the two judges (Sonnet, temp 0) ----------
 
 def _judge(system, user, key):
-    r = RE.brt.converse(
-        modelId=GEN_MODEL,
-        messages=[{"role": "user", "content": [{"text": user}]}],
-        system=[{"text": system}],
-        inferenceConfig={"temperature": 0, "maxTokens": 250})
-    txt = r["output"]["message"]["content"][0]["text"]
+    txt = RE.claude_text(GEN_MODEL, system, user, max_tokens=250, temperature=0)
     m = re.search(r"\{.*\}", txt, re.DOTALL)
     try:
         return bool(json.loads(m.group(0))[key]) if m else False

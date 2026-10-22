@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from shared.structured import structured_call
 
-MODEL = "eu.anthropic.claude-sonnet-4-6"
+MODEL = "claude-sonnet-4-6"
 
 
 class InsightGrade(BaseModel):

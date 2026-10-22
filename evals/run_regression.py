@@ -14,22 +14,21 @@ Scope note: this replays the JUDGMENT policy (rules + model), not the full Herme
 harness; outcome-grading applies to the live brief (inbox/heartbeat checks), not here.
 Regression semantics: suite target is 100% - any failing item = alarm, fix before ship.
 
-Run with Hermes venv python (has boto3 + langfuse): needs a live AWS session.
+Run with Hermes venv python (has anthropic + langfuse): needs a live AWS session
+for the key lookup, see shared/claude.py.
   ~/.hermes/hermes-agent/venv/bin/python tools/run_triage.py [--trials 3]
 """
 import argparse, json, os, re, sys, time
 
-import boto3
 from pydantic import BaseModel
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
+from shared.claude import client
 from shared.structured import structured_call
 GOLD = os.path.expanduser("~/twin-corpus/datasets/brief-inbox-decisions.jsonl")
-REGION = "eu-west-1"
-MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
-JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
-brt = boto3.client("bedrock-runtime", region_name=REGION)
+MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-4-6")
+JUDGE_MODEL = "claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 
 def _load_production_rules():
     """Extract the decision rules FROM the deployed skill so the gate tests the
@@ -82,14 +81,11 @@ Cover every gold assertion, each exactly once."""
 
 def claude(system, user, max_tokens=500, temperature=0.4, model=None):
     t0 = time.time()
-    r = brt.converse(modelId=model or MODEL,
-                     system=[{"text": system}],
-                     messages=[{"role": "user", "content": [{"text": user}]}],
-                     inferenceConfig={"maxTokens": max_tokens, "temperature": temperature})
-    # gpt-oss returns a reasoning block before the text block - find the text
-    text = next(c["text"] for c in r["output"]["message"]["content"] if "text" in c)
-    usage = r.get("usage", {})
-    return text, time.time() - t0, usage.get("outputTokens", 0)
+    r = client().messages.create(model=model or MODEL, system=system,
+                                 messages=[{"role": "user", "content": user}],
+                                 max_tokens=max_tokens, temperature=temperature)
+    text = "".join(b.text for b in r.content if b.type == "text")
+    return text, time.time() - t0, r.usage.output_tokens
 
 
 def decide(user):

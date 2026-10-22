@@ -7,25 +7,20 @@ prefetch fixture + the real production skill. Scored by:
 Usage: TWIN_TASK_MODEL=<model> python evals/run_brief_bench.py [--fixture YYYY-MM-DD]
 """
 import argparse, glob, json, os, re, sys
-import boto3
-from botocore.config import Config as BotoCfg
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for line in open(os.path.join(HERE, ".env")):
     if "=" in line and not line.strip().startswith("#"):
         k, v = line.strip().split("=", 1)
         os.environ.setdefault(k, v)
+sys.path.insert(0, HERE)
+from shared.claude import text
 
-MODEL = os.environ.get("TWIN_TASK_MODEL", "eu.anthropic.claude-sonnet-4-6")
-JUDGE = "eu.anthropic.claude-sonnet-4-6"  # the ruler never varies
-brt = boto3.client("bedrock-runtime", region_name="eu-west-1",
-                   config=BotoCfg(read_timeout=240, retries={"max_attempts": 3}))
+MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-4-6")
+JUDGE = "claude-sonnet-4-6"  # the ruler never varies
 
 def call(model, system, user, max_tokens=3000, temperature=0.4):
-    r = brt.converse(modelId=model, system=[{"text": system}],
-                     messages=[{"role": "user", "content": [{"text": user}]}],
-                     inferenceConfig={"maxTokens": max_tokens, "temperature": temperature})
-    return next(c["text"] for c in r["output"]["message"]["content"] if "text" in c)
+    return text(model, system, user, max_tokens=max_tokens, temperature=temperature)
 
 def format_score(brief):
     """Deterministic: the same contract the watchdog enforces. Returns (score, fails)."""

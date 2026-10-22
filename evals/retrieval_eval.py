@@ -26,11 +26,14 @@ import sys
 import boto3
 import sqlite_vec
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root -> shared
+from shared.claude import text as claude_text
+
 ROOT = os.environ.get("TWIN_CORPUS", os.path.expanduser("~/twin-corpus"))
 QA = os.path.join(ROOT, "datasets", "corpus-qa.jsonl")
 OUT = os.path.join(ROOT, "datasets", "retrieval-eval-results.jsonl")
 EMBED_MODEL = "cohere.embed-multilingual-v3"
-JUDGE_MODEL = "eu.anthropic.claude-sonnet-4-6"
+JUDGE_MODEL = "claude-sonnet-4-6"
 KS = (5, 10, 20)
 LLM_K = 10            # judge context-recall at this k (the informative middle)
 COVER_HIT = 0.5       # entity coverage >= this counts as a deterministic hit
@@ -144,12 +147,7 @@ def llm_supported(question, answer, contexts):
     ctx = "\n\n".join(f"[{i+1}] ({c['source']} {c['date']} {c['chat']}) {c['text']}"
                       for i, c in enumerate(contexts))
     user = f"QUESTION:\n{question}\n\nREFERENCE ANSWER:\n{answer}\n\nCONTEXT:\n{ctx}"
-    r = brt.converse(
-        modelId=JUDGE_MODEL,
-        messages=[{"role": "user", "content": [{"text": user}]}],
-        system=[{"text": JUDGE_SYS}],
-        inferenceConfig={"temperature": 0, "maxTokens": 300})
-    txt = r["output"]["message"]["content"][0]["text"]
+    txt = claude_text(JUDGE_MODEL, JUDGE_SYS, user, max_tokens=300, temperature=0)
     m = re.search(r"\{.*\}", txt, re.DOTALL)
     try:
         return bool(json.loads(m.group(0))["supported"]) if m else False

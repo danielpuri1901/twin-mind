@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from shared.structured import structured_call
 
 DB = os.path.expanduser("~/.hermes/state.db")
-MODEL = "eu.anthropic.claude-sonnet-4-6"
+MODEL = "claude-sonnet-4-6"
 INTENTS = ("capture", "recall", "reflect", "learn", "other")
 
 
