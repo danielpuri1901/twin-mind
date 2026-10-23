@@ -32,5 +32,5 @@ never turns into "delivered" expires and the next poll retries. No prep can be s
 4. **Shadow week**: dossiers delivered with [SHADOW] prefix, Daniel verdicts them (good|bad + notes) exactly like brief verdicts -> feedback.jsonl -> first labeled dataset (`prep-dossier-verdicts.jsonl`).
 5. **Later** (post-shadow, 15+ labels): calibrated dossier judge (pinned Sonnet) on accuracy/citations/goal-quality; then and only then a model bake-off ON THIS JOB (never a proxy dataset - the rule).
 
-**Model**: Sonnet (eu.anthropic.claude-sonnet-4-6). Any swap requires this agent's own-job benchmark first.
+**Model**: Sonnet 5.5 (`claude-sonnet-5-5`, Anthropic API, since 2026-10-23). Any swap requires this agent's own-job benchmark first.
 **Store**: ~/.hermes/state/{prep-state.json, personal_circle.txt, prep-query-log.txt}. No checkpointer - every prep is a fresh run; continuity lives in files.

@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from shared.structured import structured_call
 
 DB = os.path.expanduser("~/.hermes/state.db")
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-4-6"  # the classifier is eval tooling: stays on 4.6 at temperature 0
 INTENTS = ("capture", "recall", "reflect", "learn", "other")
 
 
@@ -50,7 +50,7 @@ INTENT_SYS = (
 
 def classify(text):
     try:
-        g = structured_call(MODEL, INTENT_SYS, f"USER TURN:\n{text[:1500]}", Intent, max_tokens=200)
+        g = structured_call(MODEL, INTENT_SYS, f"USER TURN:\n{text[:1500]}", Intent, max_tokens=200, temperature=0)
         return g.intent if g.intent in INTENTS else "other"
     except Exception:
         return "other"

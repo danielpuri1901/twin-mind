@@ -24,10 +24,10 @@ from pydantic import BaseModel
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
-from shared.claude import client
+from shared.claude import client, sampling
 from shared.structured import structured_call
 GOLD = os.path.expanduser("~/twin-corpus/datasets/brief-inbox-decisions.jsonl")
-MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-4-6")
+MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-5-5")
 JUDGE_MODEL = "claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 
 def _load_production_rules():
@@ -79,21 +79,20 @@ DECISION reminds about the original ask, ignoring the later reply -> why: judged
 Cover every gold assertion, each exactly once."""
 
 
-def claude(system, user, max_tokens=500, temperature=0.4, model=None):
+def claude(system, user, max_tokens=500, temperature=None, model=None):
     t0 = time.time()
     r = client().messages.create(model=model or MODEL, system=system,
                                  messages=[{"role": "user", "content": user}],
-                                 max_tokens=max_tokens, temperature=temperature)
+                                 max_tokens=max_tokens, **sampling(temperature))
     text = "".join(b.text for b in r.content if b.type == "text")
     return text, time.time() - t0, r.usage.output_tokens
 
 
 def decide(user):
     """The candidate decision as an ENFORCED shape (was: free text + a regex for the ACTIONABLE
-    line). temperature stays 0.4 - trials exist to expose the candidate's real variance."""
+    line). Sonnet 5.5 takes no temperature; the trials expose the candidate's variance at its default sampling."""
     t0 = time.time()
-    d = structured_call(MODEL, INBOX_DECISION_RULES, user, Decision,
-                        max_tokens=500, temperature=0.4)
+    d = structured_call(MODEL, INBOX_DECISION_RULES, user, Decision, max_tokens=500)
     return d, time.time() - t0
 
 
@@ -122,7 +121,7 @@ def model_grader(item, decision_text):
     empty-assertions default that corrupted the gate). Raises loudly if it cannot validate."""
     user = (f"DECISION:\n{decision_text}\n\nEXPECTED OUTPUT:\n{item['expected_output']}\n\n"
             f"GOLD ASSERTIONS:\n" + "\n".join(f"- {a}" for a in item["gold_behavior"]))
-    return structured_call(JUDGE_MODEL, JUDGE_SYS, user, AssertionVerdicts, max_tokens=1500)
+    return structured_call(JUDGE_MODEL, JUDGE_SYS, user, AssertionVerdicts, max_tokens=1500, temperature=0)
 
 
 def main():

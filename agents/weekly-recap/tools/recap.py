@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Luxembourg")          # box runs in Ireland; Daniel is in Luxembourg - pin it
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5-5"
 # .../agents/weekly-recap/tools/recap.py -> repo root is four dirs up
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 CHANGELOG = os.path.join(REPO, "docs", "CHANGELOG.md")
@@ -110,7 +110,7 @@ def compose(changelog_block, reflection):
             f"{meetings or '(no meetings captured this week)'}\n\n"
             f"DANIEL'S REFLECTION (his words - keep them, never invent or extend):\n"
             f"{(reflection or '').strip() or '(none provided)'}")
-    return text(MODEL, SYS, user, max_tokens=3500, temperature=0)
+    return text(MODEL, SYS, user, max_tokens=3500)
 
 
 if __name__ == "__main__":

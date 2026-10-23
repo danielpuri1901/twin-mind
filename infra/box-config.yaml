@@ -6,7 +6,7 @@
 # Inference: the Anthropic API since 2026-10-22; the anthropic-key plugin supplies
 # ANTHROPIC_API_KEY from AWS Secrets Manager at startup. Embeddings stay on Bedrock.
 model:
-  default: claude-sonnet-4-6
+  default: claude-sonnet-5-5
   provider: anthropic
 auxiliary:
   compression:

@@ -1,5 +1,18 @@
 # Twin Mind - canonical changelog
 
+## 2026-10-23
+
+Production Claude calls moved from Sonnet 4.6 to Sonnet 5.5 (`claude-sonnet-5-5`), on Daniel's instruction. The eval judges stay on Sonnet 4.6 at temperature 0, so the ruler does not move with the candidate.
+
+- Sonnet 5.5 rejects two things the 4.6 code relied on, both verified with real 400s: `tool_choice` of type `tool` or `any` ("not supported for this model") and `temperature` ("deprecated for this model").
+- `shared/structured.py` now uses structured outputs (`output_config.format`, the Pydantic model's JSON schema through `anthropic.transform_schema`) instead of forced tool use. Same contract: validate with Pydantic, feed the error back, raise after the retries. Verified on 4.6 and 5.5, including the retry path.
+- `shared/claude.py`: `MODEL = claude-sonnet-5-5`; `temperature` goes on the wire only when a caller sets it (`sampling()`), so the 5.5 paths send none and the 4.6 judges keep 0.
+- On 5.5: Hermes chat (`infra/box-config.yaml`), the brief composer, the weekly recap, `query_time`, and the candidates in the regression bench, the brief bench and the generation eval. On 4.6: `evals/judges.py`, the regression grader, the brief-bench judge, the retrieval judge, the generation-eval judges (new `JUDGE_MODEL`) and the intent classifier in `evals/agent/cases.py`.
+- Hermes needs no code change: `agent/anthropic_adapter.py` strips sampling params for Claude models after 4.6, and `claude-sonnet-5-5` is in its model catalog.
+- Morning: at 08:45 CEST the Anthropic API refused one chat turn with "Your credit balance is too low to access the Anthropic API"; calls worked again by 09:10. The org behind `aws-inference` needs a balance check. AgentLab spends from the same key.
+- Box deploy 09:30 CEST: the nine changed files pushed, `~/.hermes/config.yaml` `model.default` set to `claude-sonnet-5-5` (backup `config.yaml.bak-sonnet46-20261023`), gateway restarted and active. On the box `query_time` returned a validated range through structured outputs on Sonnet 5.5, and a new session row carries `claude-sonnet-5-5`. The one-shot Hermes turn then failed with the same credit error ("Your credit balance is too low") at 09:32, so the chat path on 5.5 is unverified until the org has credits; the brief dry run was not attempted for the same reason.
+- Twin's own answer to "what model are you" is a guess ("Sonnet 4"); the system prompt never names the model. Ground truth is the `sessions` row in `state.db`, the gateway journal, or `/model` in the chat.
+
 ## 2026-10-22
 
 Claude inference moved from Bedrock to the Anthropic API, on Daniel's instruction, so inference runs on Anthropic API credits and AWS credits pay for infrastructure only.

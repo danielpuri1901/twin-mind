@@ -9,12 +9,16 @@ It is read at runtime by whoever needs it: the box through its instance role,
 the Mac through its AWS session. The environment wins when it is set, so a
 local ANTHROPIC_API_KEY or the Hermes gateway (see the anthropic-key plugin)
 skips the lookup. Nothing writes the key to disk.
+
+Production runs Sonnet 5.5 since 2026-10-23. Sonnet 5.5 rejects `temperature`
+("deprecated for this model"), so the parameter only goes on the wire when a
+caller sets it; the eval judges on Sonnet 4.6 still pass 0.
 """
 import json
 import os
 from functools import lru_cache
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5-5"
 SECRET_ID = "aws-inference"
 KEY_ENV = "ANTHROPIC_API_KEY"
 
@@ -54,9 +58,14 @@ def client():
     return anthropic.Anthropic(api_key=api_key(), max_retries=3)
 
 
-def text(model, system, user, *, max_tokens, temperature=0):
-    """One text reply, no tools: the shape the recap and the evals used on Bedrock."""
+def sampling(temperature):
+    """The sampling kwargs for one call: nothing unless the caller set a temperature."""
+    return {} if temperature is None else {"temperature": temperature}
+
+
+def text(model, system, user, *, max_tokens, temperature=None):
+    """One text reply, no tools: the shape the recap and the evals use."""
     r = client().messages.create(
         model=model, system=system, messages=[{"role": "user", "content": user}],
-        max_tokens=max_tokens, temperature=temperature)
+        max_tokens=max_tokens, **sampling(temperature))
     return "".join(b.text for b in r.content if b.type == "text")

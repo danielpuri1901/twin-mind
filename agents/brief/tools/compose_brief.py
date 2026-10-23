@@ -39,7 +39,7 @@ from shared.novelty import filter_novel_with_vectors, record as record_seen
 from shared.structured import structured_call, traceable, tracing_context
 from pydantic import BaseModel
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5-5"
 DIV = "━" * 29   # the section divider the format contract requires
 SEND_EMAIL = os.path.join(HERE, "send_email.py")
 FIXTURE_DIR = os.path.expanduser("~/twin-corpus/datasets/brief-inputs")

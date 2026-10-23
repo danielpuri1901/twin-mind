@@ -16,10 +16,10 @@ for line in open(os.path.join(HERE, ".env")):
 sys.path.insert(0, HERE)
 from shared.claude import text
 
-MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-4-6")
+MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-5-5")
 JUDGE = "claude-sonnet-4-6"  # the ruler never varies
 
-def call(model, system, user, max_tokens=3000, temperature=0.4):
+def call(model, system, user, max_tokens=3000, temperature=None):
     return text(model, system, user, max_tokens=max_tokens, temperature=temperature)
 
 def format_score(brief):

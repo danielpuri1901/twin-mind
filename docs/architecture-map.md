@@ -29,7 +29,7 @@ flowchart TB
     end
 
     subgraph CLOUD["🧠 Managed services"]
-        ANTHROPIC["Anthropic API<br/>Claude (Sonnet 4.6 drafting, Haiku 4.5 compression)"]
+        ANTHROPIC["Anthropic API<br/>Claude (Sonnet 5.5 drafting, Haiku 4.5 compression)"]
         BEDROCK["AWS Bedrock<br/>Cohere embed · Amazon rerank"]
         LANGFUSE["Langfuse Cloud<br/>traces + evals mirror"]
     end
@@ -275,7 +275,7 @@ flowchart LR
 |---|---|
 | Box | EC2 `i-0123456789abcdef0`, t4g.small, eu-west-1, zero-inbound, SSM-only, role `twin-mind-role` |
 | Agent framework | Hermes (Nous Research) - memory, skills, cron, MCP |
-| Inference | Anthropic API since 2026-10-22: Claude Sonnet 4.6 drafting, Haiku 4.5 compression; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |
+| Inference | Anthropic API since 2026-10-22: Claude Sonnet 5.5 drafting (since 2026-10-23), Haiku 4.5 compression, eval judges on Sonnet 4.6; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |
 | Retrieval | Hybrid (FTS5 + sqlite-vec + RRF) via `corpus-search`; windowed + contextual chunks (promoted 2026-07-21) |
 | Observability | Langfuse Cloud (free tier); Braintrust for experiments |
 | Channels | Telegram Bot API (interactive), Gmail SMTP (brief + recap, send-only, recipient-locked) |

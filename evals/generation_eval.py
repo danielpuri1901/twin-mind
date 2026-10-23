@@ -32,7 +32,8 @@ for line in open(os.path.expanduser("~/.hermes/.env"), encoding="utf-8"):
         os.environ.setdefault(k, v)
 
 PROJECT = "twin-mind"
-GEN_MODEL = "claude-sonnet-4-6"   # the generator under test (production drafting model)
+GEN_MODEL = "claude-sonnet-5-5"   # the generator under test (production drafting model)
+JUDGE_MODEL = "claude-sonnet-4-6"  # the ruler never varies
 CTX_DB = os.path.join(RE.ROOT, "index", "vectors-windowed-ctx.db")   # the winning retrieval config
 K = 10
 
@@ -47,13 +48,13 @@ def generate(question, chunks):
     ctx = "\n\n".join(f"[{c.get('source','')} {c.get('date','')} {c.get('chat','')}] {c.get('text','')}"
                       for c in chunks)
     return RE.claude_text(GEN_MODEL, GEN_SYS, f"CONTEXT:\n{ctx}\n\nQUESTION: {question}",
-                          max_tokens=300, temperature=0).strip()
+                          max_tokens=300).strip()
 
 
 # ---------- the two judges (Sonnet, temp 0) ----------
 
 def _judge(system, user, key):
-    txt = RE.claude_text(GEN_MODEL, system, user, max_tokens=250, temperature=0)
+    txt = RE.claude_text(JUDGE_MODEL, system, user, max_tokens=250, temperature=0)
     m = re.search(r"\{.*\}", txt, re.DOTALL)
     try:
         return bool(json.loads(m.group(0))[key]) if m else False

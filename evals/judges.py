@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from shared.structured import structured_call
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-4-6"  # the ruler: stays on 4.6 at temperature 0 while production runs Sonnet 5.5
 
 
 class InsightGrade(BaseModel):
@@ -36,7 +36,7 @@ def judge_insight(ai_advancements):
     """Grade the AI-advancements section. Self-contained: the verdict is a property of the text alone."""
     items = ai_advancements if isinstance(ai_advancements, list) else [str(ai_advancements)]
     user = "=== AI ADVANCEMENTS ===\n" + "\n".join(str(x) for x in items)
-    return structured_call(MODEL, INSIGHT_SYS, user, InsightGrade, max_tokens=400)
+    return structured_call(MODEL, INSIGHT_SYS, user, InsightGrade, max_tokens=400, temperature=0)
 
 
 class FaithfulnessGrade(BaseModel):
@@ -60,4 +60,4 @@ def judge_coach_faithfulness(coach_output, source):
         f"{k}: {str(v)[:700]}" for k, v in (source or {}).items())
     user = ("=== COACH ===\n" + str(coach_output) +
             "\n\n=== SOURCE (the only ground truth for faithfulness) ===\n" + src[:6000])
-    return structured_call(MODEL, FAITHFULNESS_SYS, user, FaithfulnessGrade, max_tokens=400)
+    return structured_call(MODEL, FAITHFULNESS_SYS, user, FaithfulnessGrade, max_tokens=400, temperature=0)
