@@ -123,13 +123,18 @@ import contextlib, io, types
 _tmp = tempfile.mkdtemp()
 sm.STATE = os.path.join(_tmp, "prep-state.json")
 _real_run, _real_hb, _real_urlopen = sm.subprocess.run, sm.heartbeat, sm.urllib.request.urlopen
-sm.subprocess.run = lambda *a, **k: types.SimpleNamespace(returncode=0, stdout="", stderr="")
+_cron_args = []
+sm.subprocess.run = lambda *a, **k: (_cron_args.extend(a[0]),
+                                     types.SimpleNamespace(returncode=0, stdout="", stderr=""))[1]
 sm.heartbeat = lambda: None
 out = io.StringIO()
 with contextlib.redirect_stdout(out):
     sm.schedule_prep({"uid": "q1", "summary": "Interview with X", "start": now + timedelta(minutes=70),
                       "attendees": ["attendee@example.com"]}, {}, now)
 check("successful scheduling prints nothing", out.getvalue() == "")
+# Hermes v0.22 reads a bare "1m" as every minute; without --repeat 1 the prep ran every minute (2026-10-30).
+check("prep job is a one-shot", "--repeat" in _cron_args
+      and _cron_args[_cron_args.index("--repeat") + 1] == "1")
 check("successful scheduling still claims", json.load(open(sm.STATE))[sm.key_of(
     {"uid": "q1", "start": now + timedelta(minutes=70)})]["status"] == "claimed")
 tomorrow = (now.replace(hour=21, minute=5) + timedelta(days=1)).replace(hour=15, minute=0)
@@ -148,4 +153,4 @@ sm.subprocess.run, sm.heartbeat, sm.urllib.request.urlopen, sm.local_now = _real
 if FAILS:
     print(f"PREP PHYSICS: {len(FAILS)} FAILED")
     sys.exit(1)
-print("PREP PHYSICS: all 29 fixtures pass")
+print("PREP PHYSICS: all 30 fixtures pass")

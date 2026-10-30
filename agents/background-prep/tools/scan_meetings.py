@@ -183,7 +183,9 @@ def schedule_prep(ev, st, now, hermes="~/.hermes/hermes-agent/venv/bin/hermes"):
     st[key_of(ev)] = {"status": "claimed", "ts": now.isoformat(), "start": ev["start"].isoformat()}
     save_state(st)
     r = subprocess.run(os.path.expanduser(hermes).split() +
-                       ["cron", "create", "1m", prompt, "--name", f"prep-{key_of(ev)[:18]}",
+                       # --repeat 1: since Hermes v0.22 a bare "1m" is a recurring interval, not a
+                       # one-shot (2026-10-30: one prep ran every minute for 27 minutes).
+                       ["cron", "create", "1m", prompt, "--repeat", "1", "--name", f"prep-{key_of(ev)[:18]}",
                         "--skill", "background-prep", "--deliver", "telegram"],
                        capture_output=True, text=True, timeout=60)
     if r.returncode != 0:
