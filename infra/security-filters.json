@@ -1,5 +1,17 @@
 [
   {
+    "filterName": "BedrockCallNotCohereOrRerank",
+    "filterPattern": "{ ($.eventSource = \"bedrock.amazonaws.com\") && (($.eventName = \"InvokeModel*\") || ($.eventName = \"Converse*\")) && ($.errorCode NOT EXISTS) && ($.requestParameters.modelId != \"*cohere.embed-*\") && ($.requestParameters.modelId != \"*amazon.rerank-*\") }",
+    "metricTransformations": [
+      {
+        "metricName": "BedrockCallNotCohereOrRerank",
+        "metricNamespace": "TwinMind/Security",
+        "metricValue": "1",
+        "defaultValue": 0.0
+      }
+    ]
+  },
+  {
     "filterName": "CloudTrailChanges",
     "filterPattern": "{ ($.eventName = CreateTrail) || ($.eventName = UpdateTrail) || ($.eventName = DeleteTrail) || ($.eventName = StartLogging) || ($.eventName = StopLogging) }",
     "metricTransformations": [
