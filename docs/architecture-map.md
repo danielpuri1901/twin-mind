@@ -188,47 +188,24 @@ The rule is that nothing ships without the gate. The gate is run by hand, becaus
 ```mermaid
 flowchart TB
     subgraph GATE["🚦 Ship gate - evals/eval.sh (rule, run by hand)"]
-        TT["tool tests (deterministic)"]
+        TT["free tests (deterministic)"]
         REG["regression suite<br/>run_regression.py · bar = 100%"]
     end
 
-    subgraph RETR["Retrieval eval (did we FETCH the right chunk?)"]
+    subgraph RETR["Retrieval benchmarks (by hand, before a retrieval change)"]
         RE["retrieval_eval.py<br/>source_recall@k (deterministic, home labels)"]
-        HC["hybrid_check.py<br/>promotion gate (hybrid mode)"]
+        LM["longmemeval_retrieval.py"]
     end
 
-    subgraph GENR["Generation eval (did the LLM WRITE it right?)"]
-        GE["generation_eval.py<br/>faithfulness + answer_correctness"]
-    end
+    DS[("~/twin-corpus/datasets/<br/>corpus-qa ...")]
 
-    subgraph BRIEFE["Brief/judge evals"]
-        BB["run_brief_bench.py"]
-        CS["judges.py · align.py<br/>calibrated judges"]
-        PB["run_prep_bench.py"]
-    end
-
-    subgraph PLAT["Observability + platforms"]
-        BT["Braintrust (experiments)"]
-        LF["Langfuse (traces + dataset mirror)"]
-        PUSH["push_to_langfuse.py"]
-    end
-
-    DS[("~/twin-corpus/datasets/<br/>corpus-qa · brief-verdicts · prep-verdicts ...")]
-
-    DS --> RE & GE & BB
-    RE --> BT
-    RE --> HC
-    GE --> BT
-    BB --> CS
-    DS --> PUSH --> LF
+    DS --> RE
     GATE -.->|"rule, run by hand"| SHIP["deploy to box (files copied over SSM)"]
 
     classDef gate fill:#fce8e6,stroke:#ea4335,color:#000
     classDef eval fill:#fef7e0,stroke:#f9ab00,color:#000
-    classDef plat fill:#e6f4ea,stroke:#34a853,color:#000
     class GATE,TT,REG,SHIP gate
-    class RETR,GENR,BRIEFE,RE,HC,GE,BB,CS,PB,DS eval
-    class PLAT,BT,LF,PUSH plat
+    class RETR,RE,LM,DS eval
 ```
 
 ---
@@ -284,8 +261,8 @@ flowchart LR
 | Box | One private EC2 host, t4g.small, eu-west-1, zero-inbound, SSM-only. Not a git checkout; deploys are files copied by hand over SSM |
 | Chat agent | Letta Code 0.34.41, self-hosted, `twin-chat.service`, own OS user `twin-chat`, Sonnet 5.5. Bridge: `agents/chat/mods/twin_mind.ts`. Chat log: `/var/lib/twin-chat/chat-log.jsonl` (`shared/chat_log.py`). Hermes is stopped, kept for rollback |
 | Scheduled jobs | systemd timers (`infra/systemd/`): morning-brief, morning-brief-watchdog, meeting-prep-poller |
-| Inference | Anthropic API since 2026-10-22: Claude Sonnet 5.5 drafting (since 2026-10-23), Haiku 4.5 compression, eval judges on Sonnet 4.6; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |
+| Inference | Anthropic API since 2026-10-22: Claude Sonnet 5.5 drafting (since 2026-10-23), Haiku 4.5 compression; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |
 | Retrieval | Hybrid (FTS5 + sqlite-vec + RRF) via `corpus-search`; windowed + contextual chunks (promoted 2026-07-21) |
-| Observability | Langfuse Cloud (free tier) is the only trace store; Braintrust for the generation eval experiments |
+| Observability | Langfuse Cloud (free tier) is the only trace store |
 | Channels | Telegram Bot API (interactive), Gmail SMTP (brief + recap, send-only, recipient-locked) |
 | Hard rules | corpus never to a code remote · ship gate green before deploy (by hand) · approval for send/spend/irreversible and for each web fetch |

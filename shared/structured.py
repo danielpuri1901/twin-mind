@@ -25,7 +25,7 @@ Thinking counts against max_tokens on Sonnet 5.5, so a small budget can end with
 for every caller. It costs nothing unless the model uses it.
 
 Tracing goes to Langfuse (LangSmith removed 2026-10-28). Each call is a Langfuse generation with
-its model and token usage, so evals/costs.py prices the brief and the judges, not only chat.
+its model and token usage, so evals/costs.py prices the brief, not only chat.
 """
 import os
 

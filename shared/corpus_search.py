@@ -5,7 +5,7 @@ corpus_search.py - THE retrieval contract for the twin.
     corpus-search "query" [--k 20] [--since YYYY-MM-DD] [--who me|them]
 
 Prints JSON lines: {source, chat, date, who, sender, text, score}.
-Everything (Hermes skills, eval judges, future agents) calls ONLY this
+Everything (chat tools, jobs, future agents) calls ONLY this
 contract. The backend (SQLite FTS5 today, embeddings someday) is swappable
 behind it without touching any consumer.
 """

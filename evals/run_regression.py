@@ -36,7 +36,7 @@ JUDGE_MODEL = "claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 def _load_production_rules():
     """Take the decision rules FROM the live brief prompt (SYS in compose_brief.py), so the gate
     tests the text that ships. Read with ast, not import: importing compose_brief pulls in
-    prefetch, the corpus and the Langfuse judges. Raises loudly if SYS or its bullet moves."""
+    prefetch and the corpus. Raises loudly if SYS or its bullet moves."""
     src = open(os.path.join(HERE, "agents/brief/tools/compose_brief.py")).read()
     sys_prompt = next(ast.literal_eval(n.value) for n in ast.parse(src).body
                       if isinstance(n, ast.Assign) and n.targets[0].id == "SYS")

@@ -3,7 +3,6 @@
 anthropic==0.87.0
 boto3==1.42.89
 langfuse==4.13.0
-langsmith==0.10.10
 pydantic==2.13.4
 python-dateutil==2.9.0.post0
 sqlite-vec==0.1.9

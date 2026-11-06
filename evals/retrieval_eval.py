@@ -11,10 +11,10 @@ Two hit definitions, both reported (deterministic anchor + RAGAS-style judge):
   - entity_recall@k  : fraction of the gold answer's key tokens (proper nouns / numbers / dates)
                        that appear in the concatenated top-k text. Deterministic, reproducible,
                        no LLM. Reported as mean-coverage and as hit-rate (coverage >= 0.5).
-  - llm_recall@k     : an LLM judge (Bedrock Sonnet, temp 0) decides whether the top-k retrieved
+  - llm_recall@k     : an LLM judge (Sonnet, temp 0) decides whether the top-k retrieved
                        context actually SUPPORTS the gold answer. This is RAGAS `context_recall`.
 
-Run on the box (Bedrock via instance role). Writes results JSONL for the Langfuse/Braintrust mirror.
+Run on the box (Bedrock via instance role). Writes results JSONL.
 """
 import argparse
 import json

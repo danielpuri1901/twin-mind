@@ -12,7 +12,7 @@ skips the lookup. Nothing writes the key to disk.
 
 Production runs Sonnet 5.5 since 2026-10-23. Sonnet 5.5 rejects `temperature`
 ("deprecated for this model"), so the parameter only goes on the wire when a
-caller sets it; the eval judges on Sonnet 4.6 still pass 0.
+caller sets it; older models that accept temperature still pass 0.
 """
 import json
 import os
