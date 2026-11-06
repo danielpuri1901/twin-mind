@@ -1,5 +1,20 @@
 # Twin Mind - canonical changelog
 
+## 2026-10-28
+
+LangSmith removed from Twin Mind, on Daniel's instruction. Langfuse is the only trace store, and the brief's LLM judges run from the box on the Anthropic API instead of inside LangSmith on Bedrock.
+
+- Why Langfuse and not LangSmith: Twin's LangSmith runs carried 0 tokens and $0 cost (the `langsmith-trace` plugin logged no usage). Langfuse is the only per-call cost source, and `evals/costs.py` reads it.
+- `shared/structured.py`: tracing moved from `langsmith` to `langfuse` (`observe`, `propagate_attributes`, `get_client`). Each `structured_call` is a Langfuse generation with its model and summed token usage, so the brief and the judges now show cost, not only chat. The SDK reads `LANGFUSE_*`; the module copies the box's `HERMES_LANGFUSE_*` names. With no keys, tracing is a silent no-op (the Mac ship gate).
+- `agents/brief/tools/compose_brief.py`: one Langfuse trace per morning, `brief`, holding `brief.compose` and then the scores. Session `brief`, tags `agent:brief`, `env:prod`.
+- `evals/brief_quality_judge.py` is now `score_brief()`: the calibrated judges in `evals/judges.py` (Sonnet 4.6, temperature 0, Anthropic API) plus the trace-only code checks score the trace as `insight_is_real`, `coach_faithfulness`, `sections_present`, `no_em_dash`. Fail-open. This replaces the LangSmith online evaluators, which ran `eu.anthropic.claude-sonnet-4-5` on Bedrock through a stored Bedrock API key. The production judge and the measured judge are now the same code.
+- `evals/align.py` runs on Langfuse experiments. The LangSmith datasets `brief-insight-golden` (17), `morning-brief` (9), `regression-judge` (9) and the insight evaluator's corrections (19, now `brief-insight-evaluator-corrections`) were copied into Langfuse Twin-mind, item ids = LangSmith example ids.
+- `infra/hermes-plugins/langsmith-trace` deleted.
+- Verified on the Mac: `evals/test_compose_brief.py` 23/23; `evals/eval.sh` GREEN (regression 9/9); `score_brief()` on the real 2026-10-28 brief wrote 4 scores and 2 priced generations ($0.0077) to a Langfuse test trace (session `brief-scoring-test`).
+- FINDING, not fixed: the insight judge-alignment gate FAILS. `align.py insight --gate` reads agreement 0.76 (floor 0.85), precision 1.00, recall 0.67, 4 false negatives: the judge is stricter than Daniel's labels. The recorded baseline 0.94 is from July on Bedrock with forced tool use; no gate result is recorded since the 2026-10-22 provider move or the 2026-10-23 structured-outputs move. Next: A/B the judge (structured outputs vs forced tool use on Sonnet 4.6) before trusting its scores.
+- FINDING: the 2026-10-28 brief scored `coach_faithfulness` 0: the coach cites an "AWS MFA alarm from 27 Oct" that the judge did not find in the facts it saw (the judge truncates the source to 6,000 characters).
+- Box deploy PENDING Daniel's go (the auto-mode classifier blocks production deploys): back up, sync the 7 files, remove `langsmith-trace` from `~/.hermes/config.yaml` and `LANGSMITH_*` from `~/.hermes/.env`, restart the gateway, dry-run the brief.
+
 ## 2026-10-23
 
 Production Claude calls moved from Sonnet 4.6 to Sonnet 5.5 (`claude-sonnet-5-5`), on Daniel's instruction. The eval judges stay on Sonnet 4.6 at temperature 0, so the ruler does not move with the candidate.

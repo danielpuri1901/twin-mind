@@ -15,8 +15,9 @@ sys.path.insert(0, str(ROOT))
 
 structured = types.ModuleType("shared.structured")
 structured.structured_call = lambda *args, **kwargs: None
-structured.traceable = lambda *args, **kwargs: lambda function: function
-structured.tracing_context = lambda **kwargs: contextlib.nullcontext()
+structured.observe = lambda *args, **kwargs: lambda function: function
+structured.propagate_attributes = lambda **kwargs: contextlib.nullcontext()
+structured.get_client = None  # no Langfuse: score_brief skips the judges
 sys.modules["shared.structured"] = structured
 
 import compose_brief as compose

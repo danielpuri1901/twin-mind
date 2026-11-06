@@ -2,9 +2,9 @@
 """The brief's content judges - ONE source of truth.
 
 Each judge grades a single ambiguous dimension code cannot check: a binary verdict plus a
-one-sentence critique, on Bedrock (EU) at temp 0. The LangSmith online evaluators must mirror
-these prompts verbatim, so the UI judge and the code judge stay the SAME judge - edit the prompt
-here, then paste it into the online evaluator. align.py measures whichever judge lives here.
+one-sentence critique, on the Anthropic API at temp 0. Every real brief is scored with these exact
+judges (evals/brief_quality_judge.py, onto its Langfuse trace), and align.py measures them, so
+there is no second copy of a prompt to keep in sync.
 """
 import os
 import sys

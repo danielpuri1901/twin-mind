@@ -19,17 +19,37 @@ History: Bedrock Converse forced tool use until 2026-10-22, Messages API forced 
 day, structured outputs since 2026-10-23: Sonnet 5.5 rejects `tool_choice` of type `tool` or `any`
 ("not supported for this model"), and structured outputs work on Sonnet 4.6 (the eval judges) too.
 `temperature` is sent only when the caller sets it; Sonnet 5.5 rejects the parameter.
+
+Thinking counts against max_tokens on Sonnet 5.5, so a small budget can end with no text at all
+(the 2026-11-06 ship gate: 500 tokens, one thinking block, no answer). MIN_MAX_TOKENS is a floor
+for every caller. It costs nothing unless the model uses it.
+
+Tracing goes to Langfuse (LangSmith removed 2026-10-28). Each call is a Langfuse generation with
+its model and token usage, so evals/costs.py prices the brief and the judges, not only chat.
 """
+import os
+
 import anthropic
 from pydantic import BaseModel, ValidationError
 from shared.claude import client, sampling
 
+MIN_MAX_TOKENS = 4000
+
+# The box names the Langfuse keys for the Hermes plugin; the SDK reads the plain names.
+for _name in ("PUBLIC_KEY", "SECRET_KEY", "BASE_URL"):
+    if os.environ.get(f"HERMES_LANGFUSE_{_name}"):
+        os.environ.setdefault(f"LANGFUSE_{_name}", os.environ[f"HERMES_LANGFUSE_{_name}"])
+
 try:
-    from langsmith import traceable, tracing_context
+    if not os.environ.get("LANGFUSE_PUBLIC_KEY"):
+        raise ImportError("no Langfuse keys")  # trace nothing and log nothing, e.g. the Mac ship gate
+    from langfuse import get_client, observe, propagate_attributes
 except ImportError:  # tracing is optional; a missing lib must never break a live agent
     from contextlib import contextmanager
 
-    def traceable(*d_args, **d_kwargs):
+    get_client = None
+
+    def observe(*d_args, **d_kwargs):
         if len(d_args) == 1 and callable(d_args[0]) and not d_kwargs:
             return d_args[0]
 
@@ -38,11 +58,21 @@ except ImportError:  # tracing is optional; a missing lib must never break a liv
         return _decorator
 
     @contextmanager
-    def tracing_context(**_kwargs):
+    def propagate_attributes(**_kwargs):
         yield
 
 
-@traceable(name="structured_call")
+def _record_usage(model_id, usage):
+    """Put the model and summed token usage on the current Langfuse generation. Fail-open."""
+    if get_client is None:
+        return
+    try:
+        get_client().update_current_generation(model=model_id, usage_details=usage)
+    except Exception:
+        pass
+
+
+@observe(name="structured_call", as_type="generation")
 def structured_call(model_id, system, user, schema, *, max_tokens=2500, temperature=None, retries=2):
     """Make `model_id` return an instance of `schema` (a Pydantic BaseModel subclass) through
     structured outputs, validate it, and return the validated instance. Retries with the validation
@@ -50,10 +80,16 @@ def structured_call(model_id, system, user, schema, *, max_tokens=2500, temperat
     fmt = {"type": "json_schema", "schema": anthropic.transform_schema(schema)}
     messages = [{"role": "user", "content": user}]
     last_err = "no attempt"
+    usage = {"input": 0, "output": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
     for _ in range(retries + 1):
         r = client().messages.create(
             model=model_id, system=system, messages=messages,
-            output_config={"format": fmt}, max_tokens=max_tokens, **sampling(temperature))
+            output_config={"format": fmt}, max_tokens=max(max_tokens, MIN_MAX_TOKENS), **sampling(temperature))
+        usage["input"] += r.usage.input_tokens
+        usage["output"] += r.usage.output_tokens
+        usage["cache_read_input_tokens"] += r.usage.cache_read_input_tokens or 0
+        usage["cache_creation_input_tokens"] += r.usage.cache_creation_input_tokens or 0
+        _record_usage(model_id, usage)
         text = "".join(b.text for b in r.content if b.type == "text")
         if not text.strip():   # a budget or refusal stop; the same request again would not help
             raise RuntimeError(f"structured_call({schema.__name__}): no text, stop_reason={r.stop_reason}, "

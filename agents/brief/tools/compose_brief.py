@@ -36,7 +36,8 @@ sys.path.insert(0, REPO)                                # shared.structured
 import prefetch as PF
 import project_activity as PA
 from shared.novelty import filter_novel_with_vectors, record as record_seen
-from shared.structured import structured_call, traceable, tracing_context
+from shared.structured import observe, propagate_attributes, structured_call
+from evals.brief_quality_judge import score_brief
 from pydantic import BaseModel
 
 MODEL = "claude-sonnet-5-5"
@@ -82,12 +83,12 @@ def gather_facts():
                          capture_output=True, text=True, timeout=60).stdout.strip()
     inbox_text, n = PF.inbox()
     try:
-        with open(os.path.expanduser("~/.hermes/state/last_brief_sent"), encoding="utf-8") as handle:
+        with open(os.path.expanduser("~/.twin-mind/state/last_brief_sent"), encoding="utf-8") as handle:
             cursor = handle.read().strip()[:16]
     except Exception:
         cursor = "the last 24h"
     try:
-        with open(os.path.expanduser("~/.hermes/state/digest-covered.txt"), encoding="utf-8") as handle:
+        with open(os.path.expanduser("~/.twin-mind/state/digest-covered.txt"), encoding="utf-8") as handle:
             covered = handle.read().strip()
     except Exception:
         covered = "(none yet)"
@@ -177,7 +178,7 @@ def build_user(facts):
     ])
 
 
-@traceable(name="brief.compose", tags=["agent:brief", "env:prod"])
+@observe(name="brief.compose")
 def compose(facts):
     return structured_call(MODEL, SYS, build_user(facts), Brief, max_tokens=3000)
 
@@ -225,6 +226,14 @@ def compose_with_technical_gate(facts):
         brief.technical_thing = None
         return brief, selected, "rejected_repeat", semantic, None
     return brief, selected, "delivered", semantic, checked[0][1]
+
+
+@observe(name="brief", capture_input=False, capture_output=False)
+def compose_and_score(facts):
+    """One Langfuse trace per morning: brief.compose, then the judges' scores on that trace."""
+    composed = compose_with_technical_gate(facts)
+    score_brief(composed[0].model_dump(), facts)
+    return composed
 
 
 # ---------- deterministic render (format is code, not a creative choice) ----------
@@ -330,8 +339,8 @@ def main():
     a = ap.parse_args()
 
     facts = gather_facts()
-    with tracing_context(metadata={"thread_id": "brief"}):   # group brief runs into one LangSmith thread
-        brief, selected, technical_status, semantic, semantic_vector = compose_with_technical_gate(facts)
+    with propagate_attributes(session_id="brief", tags=["agent:brief", "env:prod"]):   # one Langfuse session for all briefs
+        brief, selected, technical_status, semantic, semantic_vector = compose_and_score(facts)
     subject = f"Morning brief - {facts['date_subject']}"
     email = render(brief, facts)
 

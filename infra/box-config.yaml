@@ -8,6 +8,12 @@
 model:
   default: claude-sonnet-5-5
   provider: anthropic
+# Hermes lists Sonnet 4.6 and 5.5 with a 1M-token window, so the default
+# threshold (0.50) waits until 500k tokens before it compacts. 0.15 compacts at
+# about 150k, the default trigger of Anthropic's own server-side compaction. It
+# is the overflow backstop; the daily session reset keeps everyday calls small.
+compression:
+  threshold: 0.15
 auxiliary:
   compression:
     model: claude-haiku-4-5
@@ -28,7 +34,5 @@ plugins:
     - anthropic-key
     - observability/langfuse
   disabled: []
-mcp_servers:
-  notion:
-    url: https://mcp.notion.com/mcp
-    auth: oauth
+# No MCP servers. Notion was removed on 2026-10-23: unused since 2026-09-28, and its
+# 69 tool definitions cost about 86k input tokens on every call.

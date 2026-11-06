@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Align a judge to Daniel's labels as a LangSmith experiment - the standard alignment step.
+"""Align a judge to Daniel's labels as a Langfuse experiment - the standard alignment step.
 
-client.evaluate() runs the judge over its golden dataset. The number is computed in code (fixed
-schema, trustworthy) AND it lands as a clickable experiment under
-Datasets & Experiments -> <golden dataset> -> Experiments (per-row, in the UI). Run this on every
-judge change and read precision/recall vs the labels; the DISAGREEMENTS it prints are the flywheel
-fuel - each one is a row to re-label or a judge-prompt fix.
+run_experiment() runs the judge over its golden dataset. The number is computed in code (fixed
+schema, trustworthy) AND it lands as a clickable experiment run under
+Datasets -> <golden dataset> -> Runs (per-row, in the UI). Run this on every judge change and read
+precision/recall vs the labels; the DISAGREEMENTS it prints are the flywheel fuel - each one is a
+row to re-label or a judge-prompt fix. The golden datasets moved from LangSmith on 2026-10-28.
 
 Usage (on the box):
   python3 evals/align.py insight
@@ -15,14 +15,15 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
-for _l in open(os.path.expanduser("~/.hermes/.env"), encoding="utf-8"):
+for _l in open(os.path.expanduser("~/.twin-mind/.env"), encoding="utf-8"):
     if "=" in _l and not _l.strip().startswith("#"):
         _k, _v = _l.strip().split("=", 1)
         os.environ.setdefault(_k, _v)
 
-from langsmith import Client
+from langfuse import Evaluation
 
 from evals.judges import judge_coach_faithfulness, judge_insight
+from shared.structured import get_client
 
 
 def _t_insight(inp):
@@ -58,30 +59,34 @@ SPECS = {
 
 
 def run(name):
+    if get_client is None:
+        sys.exit("align.py needs Langfuse keys: LANGFUSE_* or HERMES_LANGFUSE_* (the box has them in ~/.twin-mind/.env)")
     spec = SPECS[name]
     label = spec["label"]
 
-    def agreement(run, example):
-        pred = int(bool(run.outputs.get("prediction")))
-        ref = int(example.outputs.get(label))
-        return {"key": "agreement", "score": 1 if pred == ref else 0}
+    def task(*, item, **_):
+        return spec["target"](item.input)
 
-    client = Client()
-    results = client.evaluate(
-        spec["target"],
-        data=spec["dataset"],
+    def agreement(*, output, expected_output, **_):
+        pred = int(bool(output.get("prediction")))
+        return Evaluation(name="agreement", value=1 if pred == int(expected_output.get(label)) else 0)
+
+    results = get_client().get_dataset(spec["dataset"]).run_experiment(
+        name=f"align-{name}",
+        task=task,
         evaluators=[agreement],
-        experiment_prefix=f"align-{name}",
         max_concurrency=4,
     )
 
     tp = fp = tn = fn = 0
     disagreements = []
-    for row in results:
-        inp = row["example"].inputs
-        pred = int(bool(row["run"].outputs.get("prediction")))
-        reason = row["run"].outputs.get("reason", "")
-        ref = int(row["example"].outputs.get(label))
+    for row in results.item_results:
+        if row.output is None:
+            raise RuntimeError(f"judge failed on dataset item {row.item.id}; alignment would be wrong")
+        inp = row.item.input
+        pred = int(bool(row.output.get("prediction")))
+        reason = row.output.get("reason", "")
+        ref = int(row.item.expected_output.get(label))
         if pred and ref:
             tp += 1
         elif pred and not ref:
@@ -102,7 +107,8 @@ def run(name):
     print(f"\n=== alignment: {name}  ({spec['dataset']}, n={total}) ===")
     print(f"agreement={agree:.2f}  precision={prec:.2f}  recall={rec:.2f}  "
           f"(tp={tp} fp={fp} tn={tn} fn={fn})")
-    print(f"experiment: {getattr(results, 'experiment_name', '?')}")
+    print(f"experiment run: {results.run_name}")
+    get_client().flush()
 
     print(f"\n=== disagreements ({len(disagreements)}) - judge vs your label ===")
     if not disagreements:

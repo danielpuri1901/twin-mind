@@ -5,11 +5,11 @@ These are the "code check" layer from the eval design: intrinsic properties that
 answer (sections present, format, date, source-bound technical fields, and no em dash).
 The SAME functions run in three places:
   - the offline gate (evals/brief_eval.py),
-  - the LangSmith online code evaluators (the trace-only ones), and
+  - the scores on every brief's Langfuse trace (the trace-only ones, evals/brief_quality_judge.py), and
   - the box-side liveness heartbeat (the ones that need the repo on disk).
 
 Each check is a pure function taking the brief as a plain dict and returning a CheckResult.
-`TRACE_ONLY` lists the checks that can run inside LangSmith's server-side sandbox.
+`TRACE_ONLY` lists the checks that need only the brief itself.
 """
 from __future__ import annotations
 
@@ -83,12 +83,12 @@ def no_em_dash(brief: dict) -> CheckResult:
     return CheckResult("no_em_dash", ok, "ok" if ok else "contains em dash")
 
 
-# Checks that need only the brief itself - safe to run inside LangSmith's server-side sandbox.
+# Checks that need only the brief itself - no repo, no external context.
 TRACE_ONLY = [sections_present, no_em_dash]
 
 
 def run_trace_only(brief: dict) -> list[CheckResult]:
-    """The trace-only checks (no repo, no external context) - for the LangSmith online evaluator."""
+    """The trace-only checks (no repo, no external context) - scored on every brief's trace."""
     return [c(brief) for c in TRACE_ONLY]
 
 
