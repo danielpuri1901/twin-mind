@@ -6,12 +6,12 @@ Three tools, all deterministic except the one compose call: `tools/nudge.py`, `t
 ```mermaid
 sequenceDiagram
     autonumber
-    participant CRON as Friday cron (box)
+    participant CRON as Friday timer (box)
     participant NUDGE as nudge.py
     participant TG as Telegram
     participant D as Daniel
     participant POLL as send_recap.py<br/>(poll every ~2 min)
-    participant DB as state.db
+    participant DB as chat log
     participant COMPOSE as recap.py (Sonnet, temp 0)
     participant MAIL as Gmail (send-only)
 
@@ -22,7 +22,7 @@ sequenceDiagram
     NUDGE->>NUDGE: write nudge_ts, clear last week's sent-marker
 
     D->>TG: reflection messages<br/>(as many as he wants, no time pressure)
-    TG->>DB: messages stored (role=user, timestamped)
+    TG->>DB: chat agent appends each message (role=user, timestamped)
 
     loop every ~2 min, 18:00-19:30
         POLL->>DB: messages since nudge_ts
@@ -52,6 +52,7 @@ sequenceDiagram
 ## Status - WIRED 2026-07-24 (first automatic run: tonight)
 
 - Agent code: built, deployed on the box, live-tested end-to-end 2026-07-18 (gate held 10 min, sent once, then no-oped).
-- Cron wired 2026-07-24, ship gate green: `weekly-recap-nudge.timer` (Fri 18:00 CEST) + `weekly-recap-poll.timer` (Fri 18:03-19:59, every 2 min).
+- Schedule (as wired 2026-07-24): `weekly-recap-nudge.timer` (Fri 18:00 CEST) and `weekly-recap-poll.timer` (Fri 18:03-19:59, every 2 min). These units are not in `infra/systemd/`, so this repo does not show them. Check them on the box before you trust this line.
+- Since 2026-11-06 the reflection is read from the chat log (`shared/chat_log.py`), not from Hermes `state.db`.
 - Race fixed at wiring time: the poll starts at 18:03 (after the nudge writes `nudge_ts`), AND `send_recap.py` refuses any `nudge_ts` older than 12h - so a poll can never compose off a previous week's nudge and fire early.
 ```
