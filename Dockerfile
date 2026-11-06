@@ -9,6 +9,7 @@
 # State, .env and the corpus stay on the host and are mounted at the same paths the code expects,
 # so the image holds no secrets and no personal data. HOME matches the box, and the user id matches
 # the box's job user, so mounted files keep the right owner.
+# tzdata and TZ matter: without them ZoneInfo fails and meeting times silently come out wrong.
 FROM python:3.11-slim-bookworm AS base
 RUN apt-get update \
     && apt-get install -y --no-install-recommends awscli ca-certificates git \
