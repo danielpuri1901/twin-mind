@@ -16,7 +16,10 @@ It runs as one standalone page with no server setup.
   Action items require source evidence and an explicit state.
   Unread flags do not establish urgency or completion.
 - **Background prep:** Creates a short dossier before professional meetings.
-- **Interactive chat:** Grounds Telegram replies in a private personal corpus.
+  Code does the research.
+  Two model calls with no tools write the text.
+- **Interactive chat:** Runs on self-hosted Letta Code behind a Telegram bot.
+  It keeps long-term memory and grounds replies in a private personal corpus.
 - **Weekly recap:** Collects build progress, the week's meetings, and personal reflection into one review.
 - **Meeting ingest:** Pulls finished meetings from Wispr Flow every 4 hours, so transcripts become searchable context.
 
@@ -26,25 +29,35 @@ A general chatbot remains better for isolated questions.
 ## How one request works
 
 ```text
-Schedule / Telegram
-        |
-        v
-Hermes Agent
-        |
-        +--> skill selects task
-        +--> code gathers facts
-        +--> corpus-search retrieves context
-        +--> Bedrock generates constrained text
-        +--> deterministic checks validate output
-        +--> approved channel delivers result
-        |
-        v
-Langfuse traces + task-specific evals
+systemd timer                      Telegram message
+(brief, watchdog, meeting prep)    (chat)
+        |                                  |
+        v                                  v
+script on the box                  Letta Code, twin-chat.service
+        |                                  |
+        +--> code gathers facts            +--> mod retrieves corpus context each turn
+        +--> corpus-search retrieves       +--> tools: corpus, code, email, web search
+        +--> Anthropic API writes          +--> Anthropic API writes
+             constrained text              +--> chat log records each message
+        +--> checks validate output
+        +--> approved channel delivers
+        |                                  |
+        +----------------+-----------------+
+                         v
+                Langfuse traces + task-specific evals
 ```
+
+Chat tracing through the chat log is not built yet.
 
 Code computes dates, counts, lookups, delivery rules.
 Models handle judgment plus writing.
 Structured model responses use schemas instead of text parsing.
+
+Only chat is an agent.
+The other jobs are plain scripts that systemd starts.
+Chat reaches the corpus through a narrow sudo rule, and its OS user has no access to the instance role, the env file or the corpus files.
+The bridge between Letta and the rest of the system is one file, `agents/chat/mods/twin_mind.ts`.
+Chat messages go to `/var/lib/twin-chat/chat-log.jsonl`, and the corpus ingest and the weekly recap read that log.
 
 ## Memory
 
@@ -55,7 +68,10 @@ Personal corpus records do not belong in the public code repository.
 
 The canonical export includes a manifest of source counts and checksums.
 Indexes are derived from that export.
-The twin's conversations are ingested on a timer, so memory does not depend on a session ending.
+The twin's conversations are ingested from the chat log on a timer, so memory does not depend on a session ending.
+The chat agent also keeps its own memory in Letta's git-backed memory files.
+Two files load every turn.
+The rest load on demand.
 
 All corpus access uses one command:
 
@@ -84,7 +100,9 @@ python3 evals/test_wispr_ingest.py
 python3 evals/test_recap_meetings.py
 ```
 
-The full ship gate uses Bedrock, so it can create a small model charge:
+The full ship gate calls the Anthropic API, so it can create a small model charge.
+Nothing enforces it.
+There is no deploy CI: a deploy is files copied by hand to the box over SSM.
 
 ```bash
 evals/eval.sh
@@ -98,7 +116,7 @@ evals/eval.sh
 | `shared/` | Corpus access, structured output, shared policy. |
 | `evals/` | Regression checks, judges, job-specific evaluation tools. |
 | `pipeline/` | Data normalization, chunking, embedding, plus the box-side meeting ingester. |
-| `infra/` | Private host templates, monitoring, runtime plugins. |
+| `infra/` | Private host templates, systemd units, sudo rule, monitoring. Hermes plugins stay for rollback. |
 | `docs/` | Design records, visual maps, technical decisions. |
 
 ## Configuration
