@@ -37,8 +37,12 @@ cannot reach the index objects. Pointing --delete at the bucket root from a
 partial tree would delete the indexes from S3, which is the obvious way to
 turn a backup improvement into data loss.
 
-Run from a timer. Exit code is non-zero only when the upload itself fails,
-so a genuine failure surfaces as a unit failure.
+Run from a timer. Exit code is non-zero when the upload fails or when any
+snapshot fails. A failed snapshot leaves an empty file behind, and syncing that
+file would replace the good copy in S3 with 0 bytes; from 2026-09-29 to
+2026-10-22 that is what happened to state.db on every run while the unit
+reported success. So the full lane uploads nothing unless every snapshot
+succeeded, and S3 keeps the last good set.
 """
 
 import argparse
@@ -57,6 +61,7 @@ BUCKET = os.environ.get("TWIN_CORPUS_BUCKET", "")
 PREFIX = os.environ.get("TWIN_CORPUS_PREFIX", "box")
 KMS_KEY = os.environ.get("TWIN_CORPUS_KMS_KEY", "")
 STATE_DB = os.environ.get("HERMES_STATE_DB") or os.path.expanduser("~/.hermes/state.db")
+CHAT_STATE = os.environ.get("TWIN_CHAT_STATE", "/var/lib/twin-chat")
 
 
 def upload(src: str, dest: str) -> int:
@@ -113,14 +118,17 @@ def snapshot_one(src: str, dst: str) -> bool:
         return False
 
 
-def snapshot_databases(staging: str) -> list:
-    """Copy the tree into staging, replacing every .db with a consistent snapshot."""
+def snapshot_databases(staging: str) -> tuple:
+    """Copy the tree into staging, replacing every .db with a consistent snapshot.
+
+    Returns (snapped, failed), both lists of paths relative to the staging root.
+    """
     shutil.copytree(
         CORPUS, staging,
-        ignore=shutil.ignore_patterns("*.db", "*.db-wal", "*.db-shm", ".git"),
+        ignore=shutil.ignore_patterns("*.db", "*.db-wal", "*.db-shm", "*.db-journal", ".git"),
         dirs_exist_ok=True,
     )
-    snapped = []
+    snapped, failed = [], []
     for root, _dirs, files in os.walk(CORPUS):
         if ".git" in root:
             continue
@@ -131,16 +139,20 @@ def snapshot_databases(staging: str) -> list:
             rel = os.path.relpath(src, CORPUS)
             dst = os.path.join(staging, rel)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
-            if snapshot_one(src, dst):
-                snapped.append(rel)
+            (snapped if snapshot_one(src, dst) else failed).append(rel)
 
-    # The Hermes session store lives outside the corpus tree and was not backed
-    # up at all. It holds every message for the window between arriving and
-    # being ingested, so without it that window has exactly one copy.
+    # The Hermes session store lives outside the corpus tree. It stops changing
+    # when chat moves to Letta and leaves when Hermes is removed.
     if os.path.exists(STATE_DB):
-        if snapshot_one(STATE_DB, os.path.join(staging, "hermes", "state.db")):
-            snapped.append("hermes/state.db")
-    return snapped
+        ok = snapshot_one(STATE_DB, os.path.join(staging, "hermes", "state.db"))
+        (snapped if ok else failed).append("hermes/state.db")
+
+    # The chat log and the agent's memory also live outside the corpus tree. The
+    # log holds every message between arriving and being ingested, and the memory
+    # exists nowhere else, because self-hosted Letta does not back itself up.
+    if os.path.isdir(CHAT_STATE):
+        shutil.copytree(CHAT_STATE, os.path.join(staging, "chat"), dirs_exist_ok=True)
+    return snapped, failed
 
 
 def main() -> int:
@@ -160,10 +172,17 @@ def main() -> int:
     if args.fast:
         return fast()
 
-    staging = tempfile.mkdtemp(prefix="corpus-sync-")
+    # Staging goes next to the corpus, not in /tmp. On the box /tmp is a 924 MB
+    # tmpfs and a full staging copy is about 1.1 GB, so the last snapshots
+    # failed with "database or disk is full".
+    staging = tempfile.mkdtemp(prefix="corpus-sync-", dir=os.path.dirname(os.path.abspath(CORPUS)))
     try:
-        snapped = snapshot_databases(staging)
+        snapped, failed = snapshot_databases(staging)
         print(f"snapshotted {len(snapped)} databases: {', '.join(snapped) or 'none'}")
+        if failed:
+            print(f"not uploading, {len(failed)} snapshot(s) failed: {', '.join(failed)}",
+                  file=sys.stderr)
+            return 1
         rc = upload(staging, f"s3://{BUCKET}/{PREFIX}/")
         if rc == 0:
             print(f"synced {CORPUS} to s3://{BUCKET}/{PREFIX}/")
