@@ -1,0 +1,7 @@
+[Unit]
+Description=Friday 18:00 weekly-recap nudge
+[Timer]
+OnCalendar=Fri *-*-* 18:00:00
+Persistent=true
+[Install]
+WantedBy=timers.target

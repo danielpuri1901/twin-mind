@@ -9,22 +9,25 @@ Ground truths this reflects: `CLAUDE.md`, `docs/2026-06-30-twin-mind-design.md`,
 
 ## 1. System at a glance
 
-Where the three worlds sit - the Mac (raw data + prep), the AWS box (the always-on twin), and the channels Daniel touches.
+Where the three worlds sit - the Mac (data prep), the AWS box (the always-on twin), and the channels Daniel touches.
+Since 2026-09-23 the corpus, raw tier included, is also backed up to a private encrypted S3 bucket (see `CLAUDE.md`).
 
 ```mermaid
 flowchart TB
-    subgraph MAC["🖥️ Mac - private, source of truth"]
-        RAW["raw corpus<br/>(iMessage, transcripts, email...)<br/>NEVER leaves the Mac"]
+    subgraph MAC["🖥️ Mac - data prep"]
+        RAW["raw corpus<br/>(iMessage, transcripts, email...)"]
         PREP["pipeline/*<br/>normalize · chunk · embed · index"]
-        REPO["repo: agents / skills / SOUL<br/>(one-way source of truth)"]
+        REPO["repo: agents / skills / SOUL<br/>(source of truth for code)"]
         RAW --> PREP
     end
 
-    subgraph BOX["☁️ AWS box - i-0123456789abcdef0 (eu-west-1, zero-inbound, SSM-only)"]
-        HERMES["Hermes Agent runtime<br/>memory · skills · cron · MCP"]
-        DERIVED["derived corpus<br/>index/ (vectors.db + corpus.db)<br/>+ datasets + wiki"]
+    subgraph BOX["☁️ AWS box (eu-west-1, zero-inbound, SSM-only)"]
+        LETTA["twin-chat.service<br/>Letta Code (chat agent, own OS user)<br/>MemFS memory"]
+        TIMERS["systemd timers<br/>brief · watchdog · meeting prep"]
+        DERIVED["corpus<br/>index/ (vectors.db + corpus.db)<br/>+ datasets"]
         AGENTS["agents: chat · brief · background-prep · weekly-recap"]
-        HERMES --- AGENTS
+        LETTA --- AGENTS
+        TIMERS --- AGENTS
         DERIVED --- AGENTS
     end
 
@@ -39,8 +42,8 @@ flowchart TB
         GMAIL["Gmail SMTP (brief + recap, send-only)"]
     end
 
-    PREP -->|"derived data only, over SSM"| DERIVED
-    REPO -->|"one-way skill sync (repo -> box)"| HERMES
+    PREP -->|"derived data, over SSM"| DERIVED
+    REPO -->|"files copied by hand over SSM"| AGENTS
     AGENTS -->|inference| ANTHROPIC
     AGENTS -->|embeddings| BEDROCK
     AGENTS -->|traces/scores| LANGFUSE
@@ -52,7 +55,7 @@ flowchart TB
     classDef cloud fill:#e6f4ea,stroke:#34a853,color:#000
     classDef chan fill:#fce8e6,stroke:#ea4335,color:#000
     class MAC,RAW,PREP,REPO mac
-    class BOX,HERMES,DERIVED,AGENTS box
+    class BOX,LETTA,TIMERS,DERIVED,AGENTS box
     class CLOUD,ANTHROPIC,BEDROCK,LANGFUSE cloud
     class CHAN,TG,GMAIL chan
 ```
@@ -140,16 +143,17 @@ flowchart TB
 
 ## 4. The agents (what runs, when)
 
-Four agents on the Hermes runtime, each a folder under `agents/`. All read the corpus through `corpus-search`; all Claude inference via the Anthropic API (shared/claude.py), embeddings via Bedrock.
+Four agents, each a folder under `agents/`. Only chat is a long-running agent, on Letta Code. The other three are scripts that systemd timers start.
+All read the corpus through `corpus-search`; all Claude inference goes through the Anthropic API (`shared/claude.py`), embeddings through Bedrock.
 
 ```mermaid
 flowchart TB
-    subgraph RT["Hermes runtime (box)"]
+    subgraph RT["Box"]
         direction TB
-        CHAT["💬 chat - interactive twin<br/>Telegram, on-demand<br/>skills: daniel-corpus · learning-partner · research-papers"]
-        BRIEF["📋 brief - morning email<br/>cron 07:30 · watchdog 07:50<br/>tools: prefetch · inbox_read · calendar_read · send_email · brief_check<br/>model: Sonnet"]
-        PREP["🗂️ background-prep - meeting dossiers<br/>poller */15 · fires 75-15 min before pro meetings<br/>tools: scan_meetings · personal_circle filter"]
-        RECAP["🗓️ weekly-recap - Friday reflection<br/>18:00 Telegram nudge -> 'done' gate -> ~19:30 email<br/>tools: nudge · recap · send_recap"]
+        CHAT["💬 chat - interactive twin<br/>Letta Code, Telegram, on-demand<br/>bridge: mods/twin_mind.ts<br/>tools: corpus · code · email · web search, web fetch (approval)<br/>log: /var/lib/twin-chat/chat-log.jsonl"]
+        BRIEF["📋 brief - morning email<br/>systemd timer 07:30 · watchdog 07:50<br/>script: compose_brief.py (one model call)<br/>tools: prefetch · inbox_read · calendar_read · send_email · brief_check<br/>model: Sonnet"]
+        PREP["🗂️ background-prep - meeting dossiers<br/>systemd timer every 15 min · fires 75-15 min before meetings<br/>code: scan_meetings · compose_prep (research in code, 2 no-tool model calls)"]
+        RECAP["🗓️ weekly-recap - Friday reflection<br/>18:00 Telegram nudge -> 'done' gate -> ~19:30 email<br/>tools: nudge · recap · send_recap<br/>reads the chat log"]
     end
 
     CORPUS["corpus-search (hybrid retrieval)"]
@@ -179,18 +183,17 @@ flowchart TB
 
 ## 5. The eval stack
 
-Nothing ships without the gate. Retrieval and generation are measured separately (RAGAS split); everything mirrors to Langfuse.
+The rule is that nothing ships without the gate. The gate is run by hand, because there is no deploy CI. Retrieval and generation are measured separately (RAGAS split); everything mirrors to Langfuse.
 
 ```mermaid
 flowchart TB
-    subgraph GATE["🚦 Ship gate - evals/eval.sh (mandatory before deploy)"]
+    subgraph GATE["🚦 Ship gate - evals/eval.sh (rule, run by hand)"]
         TT["tool tests (deterministic)"]
         REG["regression suite<br/>run_regression.py · bar = 100%"]
     end
 
     subgraph RETR["Retrieval eval (did we FETCH the right chunk?)"]
         RE["retrieval_eval.py<br/>source_recall@k (deterministic, home labels)"]
-        RB["retrieval_braintrust.py<br/>the ablation ladder"]
         HC["hybrid_check.py<br/>promotion gate (hybrid mode)"]
     end
 
@@ -200,71 +203,76 @@ flowchart TB
 
     subgraph BRIEFE["Brief/judge evals"]
         BB["run_brief_bench.py"]
-        CS["calibrate_sections.py · judge_brief.py"]
+        CS["judges.py · align.py<br/>calibrated judges"]
         PB["run_prep_bench.py"]
     end
 
     subgraph PLAT["Observability + platforms"]
         BT["Braintrust (experiments)"]
         LF["Langfuse (traces + dataset mirror)"]
-        CMP["evals/compare/ (braintrust · langfuse · arize · langsmith adapters)"]
         PUSH["push_to_langfuse.py"]
     end
 
     DS[("~/twin-corpus/datasets/<br/>corpus-qa · brief-verdicts · prep-verdicts ...")]
 
     DS --> RE & GE & BB
-    RE --> RB --> BT
+    RE --> BT
     RE --> HC
     GE --> BT
     BB --> CS
     DS --> PUSH --> LF
-    CMP --> BT & LF
-    GATE -.->|blocks deploy| SHIP["deploy to box"]
+    GATE -.->|"rule, run by hand"| SHIP["deploy to box (files copied over SSM)"]
 
     classDef gate fill:#fce8e6,stroke:#ea4335,color:#000
     classDef eval fill:#fef7e0,stroke:#f9ab00,color:#000
     classDef plat fill:#e6f4ea,stroke:#34a853,color:#000
     class GATE,TT,REG,SHIP gate
-    class RETR,GENR,BRIEFE,RE,RB,HC,GE,BB,CS,PB,DS eval
-    class PLAT,BT,LF,CMP,PUSH plat
+    class RETR,GENR,BRIEFE,RE,HC,GE,BB,CS,PB,DS eval
+    class PLAT,BT,LF,PUSH plat
 ```
 
 ---
 
 ## 6. Governance and data flow (the rules that constrain everything)
 
-The non-negotiables: raw data never leaves the Mac, the box never self-edits, humans approve anything irreversible.
+The non-negotiables: the corpus leaves the Mac only to the controlled S3 bucket, never to a code remote.
+The chat agent cannot reach secrets or the corpus files.
+Humans approve anything irreversible.
 
 ```mermaid
 flowchart LR
-    subgraph MAC["Mac (trusted)"]
-        RAW["raw corpus - encrypted, local-only git"]
+    subgraph MAC["Mac"]
+        RAW["raw corpus - local git, raw/ untracked"]
         DERIVE["derive: normalize + index"]
         RAW --> DERIVE
     end
 
-    subgraph BOX["Box (derived only)"]
-        IDX["index/ + wiki + datasets"]
-        SKILLS["skills / SOUL (read-only mirror)"]
+    subgraph BOX["Box"]
+        IDX["corpus index/ + datasets"]
+        JOBS["scripts and timers (job user)"]
+        CHATU["chat agent (twin-chat OS user)"]
     end
 
-    RAW -. "NEVER (pre-push hook hard-fails)" .-> X1["S3 / git remote / SaaS"]
+    S3["private S3 bucket<br/>KMS key, versioning, no public access, TLS only, access logs"]
+
+    RAW -. "NEVER (pre-push hook hard-fails)" .-> X1["git remote / SaaS"]
+    RAW -->|"corpus sync"| S3
     DERIVE -->|"SSM, point-to-point"| IDX
-    REPO2["repo (source of truth)"] -->|"one-way sync"| SKILLS
-    SKILLS -. "twin proposes diffs, human approves" .-> REPO2
+    IDX -->|"corpus sync, failed snapshots block upload"| S3
+    CHATU -->|"narrow sudo rule: search tools only"| JOBS
+    CHATU -. "no instance role, no .env, no corpus files" .-> X2["secrets"]
 
     subgraph HITL["Human-in-the-loop gates"]
         READ["read / search / draft -> autonomous"]
-        SEND["send / spend / commit / IAM -> approval"]
+        SEND["send / spend / commit / IAM / web fetch -> approval"]
     end
 
     classDef mac fill:#e8f0fe,stroke:#4285f4,color:#000
     classDef box fill:#fef7e0,stroke:#f9ab00,color:#000
     classDef stop fill:#fce8e6,stroke:#ea4335,color:#000
     class MAC,RAW,DERIVE mac
-    class BOX,IDX,SKILLS,REPO2 box
-    class X1,HITL,READ,SEND stop
+    class BOX,IDX,JOBS,CHATU,S3 box
+    class X1,X2,HITL,READ,SEND stop
 ```
 
 ---
@@ -273,10 +281,11 @@ flowchart LR
 
 | Thing | Value |
 |---|---|
-| Box | EC2 `i-0123456789abcdef0`, t4g.small, eu-west-1, zero-inbound, SSM-only, role `twin-mind-role` |
-| Agent framework | Hermes (Nous Research) - memory, skills, cron, MCP |
+| Box | One private EC2 host, t4g.small, eu-west-1, zero-inbound, SSM-only. Not a git checkout; deploys are files copied by hand over SSM |
+| Chat agent | Letta Code 0.34.41, self-hosted, `twin-chat.service`, own OS user `twin-chat`, Sonnet 5.5. Bridge: `agents/chat/mods/twin_mind.ts`. Chat log: `/var/lib/twin-chat/chat-log.jsonl` (`shared/chat_log.py`). Hermes is stopped, kept for rollback |
+| Scheduled jobs | systemd timers (`infra/systemd/`): morning-brief, morning-brief-watchdog, meeting-prep-poller |
 | Inference | Anthropic API since 2026-10-22: Claude Sonnet 5.5 drafting (since 2026-10-23), Haiku 4.5 compression, eval judges on Sonnet 4.6; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |
 | Retrieval | Hybrid (FTS5 + sqlite-vec + RRF) via `corpus-search`; windowed + contextual chunks (promoted 2026-07-21) |
-| Observability | Langfuse Cloud (free tier); Braintrust for experiments |
+| Observability | Langfuse Cloud (free tier) is the only trace store; Braintrust for the generation eval experiments |
 | Channels | Telegram Bot API (interactive), Gmail SMTP (brief + recap, send-only, recipient-locked) |
-| Hard rules | raw stays on Mac · one-way skill sync · ship gate green before deploy · approval for send/spend/irreversible |
+| Hard rules | corpus never to a code remote · ship gate green before deploy (by hand) · approval for send/spend/irreversible and for each web fetch |

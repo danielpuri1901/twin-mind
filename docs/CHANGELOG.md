@@ -1,5 +1,40 @@
 # Twin Mind - canonical changelog
 
+## 2026-11-06
+
+Chat moved from Hermes to self-hosted Letta, and the scheduled jobs moved to systemd timers, on Daniel's instruction.
+
+An audit of the harness found that chat had been running without auto-retrieval for 14 days.
+The 2026-10-23 Hermes upgrade started the gateway on a bare Python, so `corpus-rag` crashed on a missing boto3 and logged each crash as "no corpus hits".
+Chat exists for memory and for thinking out loud, so Daniel chose a harness built for memory over repairing Hermes.
+
+Chat:
+- `twin-chat.service` runs Letta Code 0.34.41 under its own OS user, on the same Telegram bot. Hermes is stopped and still installed for rollback.
+- Letta's prompt and stop hooks only fire in its terminal UI, so `agents/chat/mods/twin_mind.ts` carries auto-retrieval, the tools, the chat log and the shell policy.
+- `shared/chat_log.py` is the only contract the corpus ingest and the weekly recap have with the harness.
+- The agent cannot reach the instance role, `.env` or the corpus directly. Its tools run through a narrow sudo rule, and it has no shell outside its memory repo.
+- Verified on real Telegram messages: retrieval injected on 5 of 5 turns, and the ingest added the turns to the corpus. A test trace reached Langfuse.
+- New: the `twin-mind-chat-deadman` alarm, and one Langfuse trace per exchange. Chat cost is read from the Anthropic console.
+
+Jobs:
+- The brief, its watchdog and the prep poller run on systemd timers through `shared/telegram_send.py`, on `~/.twin-mind/venv`. Their Hermes cron entries are paused.
+- Meeting prep is no longer an agent. Calendar text used to reach an agent holding a host shell. Now code does the research and two model calls hold no tools.
+- LangSmith removal deployed. Langfuse is the only trace store.
+
+Silent failures found and fixed:
+- The S3 copy of `state.db` was 0 bytes. Snapshots failed on 120 runs in 30 days because staging sat in a 924 MB tmpfs, and the sync reported success.
+- Staleness alerts never arrived, because `hermes` was not on the job's PATH.
+- The watchdog ran a July copy of its script and raised false alarms.
+- Thinking on Sonnet 5.5 could use up a small token budget and return no text, so `structured_call` now has a token floor.
+
+Still open:
+- The first scheduled brief on systemd runs on 2026-11-07. Hermes is deleted only after that run is clean and Daniel confirms.
+- The Mac cannot publish project activity when `aws login` expires. The box copy is stuck at 2026-10-24.
+- The real instance id is in 4 old commits on the public `main`. It is not a credential, so history was not rewritten.
+- Reminders are off, because the agent has no shell to schedule them.
+
+Daniel chose containers built in CI and stored in ECR as the deploy path, after comparing five options. Containers keep state on local disk, because SQLite warns against network filesystems. The laptop deploys by tag, so a push to `main` does not change production. Scheduled jobs move first and chat moves last.
+
 ## 2026-10-28
 
 LangSmith removed from Twin Mind, on Daniel's instruction. Langfuse is the only trace store, and the brief's LLM judges run from the box on the Anthropic API instead of inside LangSmith on Bedrock.

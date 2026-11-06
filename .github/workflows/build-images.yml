@@ -1,0 +1,50 @@
+name: build-images
+
+# Builds the jobs image on every push to main and pushes it to ECR as jobs-<sha7>.
+# The Dockerfile runs the free tests in its test stage, so a failing test stops the push.
+# Pushing to main never changes production. The laptop deploys a tag when it chooses to.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # the short-lived AWS sign-in token
+  contents: read
+
+concurrency:
+  group: build-images
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Native arm64, the same architecture as the box: no emulation.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          # A secret, because this repository is public and the ARN names the account.
+          role-to-assume: ${{ secrets.AWS_IMAGE_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v4
+
+      - id: tag
+        run: echo "sha7=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # The build cache lives in ECR next to the images, so each run reuses the unchanged layers.
+      # ECR needs image-manifest=true for cache images.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/twin-mind:jobs-${{ steps.tag.outputs.sha7 }}
+          cache-from: type=registry,ref=${{ steps.ecr.outputs.registry }}/twin-mind:buildcache-jobs
+          cache-to: type=registry,ref=${{ steps.ecr.outputs.registry }}/twin-mind:buildcache-jobs,mode=max,image-manifest=true

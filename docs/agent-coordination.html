@@ -26,14 +26,14 @@
 <div class="card">
 <pre class="mermaid">
 flowchart TB
-    TG["📱 Telegram / email  ←→  HERMES-THE-PLUMBING<br/>gateway · state.db (message history) · delivery<br/><i>pipes, not intelligence - every agent uses them</i>"]
+    TG["📱 Telegram / email  ←→  delivery<br/>Telegram bot (Letta for chat, shared/telegram_send.py for jobs) · Gmail send-only<br/><i>pipes, not intelligence - every agent uses them</i>"]
 
     subgraph AGENTS["THE AGENTS - peers, each on its own clock, none aware of the others"]
         direction LR
-        CHAT["💬 chat twin<br/>(the ONE Hermes AGENT)<br/>ambiguous stuff: Q&A,<br/>coach, journaling, weather"]
+        CHAT["💬 chat twin<br/>(the ONE agent, on Letta Code)<br/>ambiguous stuff: Q&A,<br/>memory, thinking out loud"]
         ING["📥 meeting-ingest<br/>Wispr Flow · every 4h"]
         BRIEF["📋 brief<br/>pipeline + 1 LLM call · 07:30"]
-        PREP["🗂 background-prep<br/>script · every 15 min"]
+        PREP["🗂 background-prep<br/>script + 2 no-tool LLM calls · every 15 min"]
         RECAP["🗓 weekly-recap<br/>scripts + 1 LLM call · Friday"]
         US["🛠 CC sessions<br/>(you + me)"]
     end
@@ -47,6 +47,7 @@ flowchart TB
         NOTES["📌 state/<br/>cursors · sent-markers ·<br/>covered-topic lists"]
         CHG["📖 CHANGELOG.md<br/><i>what we learned</i>"]
         DATA["🏷 datasets/<br/>your verdicts · fixtures"]
+        LOG["💬 chat-log.jsonl<br/>every chat message"]
     end
 
     ING -- "writes meeting transcripts + summaries" --> CORPUS
@@ -55,6 +56,9 @@ flowchart TB
     CHAT -- "reads" --> CORPUS
     RECAP -- "reads meetings" --> CORPUS
 
+    CHAT -- "writes each message" --> LOG
+    LOG -- "ingested every 30 min" --> CORPUS
+    LOG -- "reflection" --> RECAP
     BRIEF -- "notes to its future self" --> NOTES
     RECAP -- "nudge-time + sent-marker" --> NOTES
 
@@ -82,7 +86,7 @@ flowchart TB
     <li><b>brief → the eval gate:</b> every real morning is saved as a fixture; the gate replays it before anything ships.</li>
   </ul>
   <b>What this pattern is called:</b> a <b>blackboard architecture</b> (1980s AI classic, now the 2025-26 industry standard for decoupled agents - Anthropic, Manus, and the FS-Researcher paper all converged on "files as the coordination medium").
-  <div class="rule">🧭 <b>Hermes is two things, not an orchestrator:</b> the <b>plumbing</b> (Telegram gateway + message history + delivery - pipes every agent uses) and <b>one peer agent</b> (the chat twin, for genuinely ambiguous work). The scheduled jobs are deterministic pipelines with at most one constrained LLM call.
+  <div class="rule">🧭 <b>No agent orchestrates the others.</b> Telegram and email are the <b>plumbing</b> (delivery - pipes every agent uses), and there is <b>one peer agent</b> (the chat twin, on Letta Code, for genuinely ambiguous work). Since 2026-11-06 the chat log, not a framework database, holds the message history. The scheduled jobs are deterministic scripts started by systemd timers, with at most two constrained LLM calls.
   <b>The rule:</b> agent loop where the task is ambiguous · pipeline where the task is predictable.</div>
 </div>
 

@@ -1,30 +1,21 @@
 # Morning brief - operational notes (governed)
 Salvaged 2026-07-13 from the twin's self-authored "morning-brief-infra-notes" (now deleted).
 ~85% of it was verified gold; false entries corrected. Credit where due: the twin discovered a
-real send_email bug (missing datetime import, fixed) and the Tirith patterns below.
-
-## Terminal security scanner (Tirith) - verified pitfalls
-- `python3 -c "..."` is BLOCKED (script-execution guard). Write a .py to /tmp and run it.
-- Emoji/Unicode variation selectors in email subject OR body block the send. Plain ASCII only.
-- `himalaya` CLI is blocked for inbox reads. Use inbox_read.py.
-- Safe send pattern: body already on disk -> `python3 send_email.py "Subject" < /tmp/body.txt`,
-  or a /tmp python wrapper using list-form subprocess (no shell interpolation).
+real send_email bug (missing datetime import, fixed).
+The brief has been a script run by a systemd timer since 2026-11-06 (`compose_brief.py`).
+Hermes terminal-scanner rules (Tirith) no longer apply and are removed.
 
 ## Tool truths
-- send_email.py: subject is POSITIONAL (no --subject flag). Success = exit 0 + "sent:" line +
+- send_email.py: plain ASCII subject and body are still the safe choice. Subject is POSITIONAL (no --subject flag). Success = exit 0 + "sent:" line +
   "heartbeat: BriefSent metric emitted". Cursor now writes correctly (datetime import fixed 07-13).
 - calendar_read.py: flags are `--days N` ONLY. There is NO --today flag (a prior twin note claiming
   it "worked" was wrong - ungoverned notes drift). Empty output = genuinely no events, not an error.
   Times are LOCAL as of the 07-13 timezone fix.
-- corpus-search does NOT index wiki/ markdown. For topic state: `cat ~/twin-corpus/wiki/topics/<t>.md`.
-  Wiki "## Correction (Daniel...)" blocks are authoritative over corpus search results.
+- corpus-search does NOT index wiki/ markdown. The chat agent's wiki moved into its Letta memory on 2026-11-06, and the brief scripts do not read it.
 
 ## Triage craft (verified patterns)
-- Latest-state = BOTH steps, always: corpus-search the person/topic AND cat the wiki topic page.
-- Granola notes from the last 24-48h are first-class triage sources (often richer than inbox);
-  list_meetings first (cheap, in the parallel batch), then get_meetings([ids]) for relevant ones.
-  Applies to academic events too (defenses, resits generate obligations).
-- Parallel-gather at run start: inbox, calendar, Granola list, web - one batch, never serial.
+- Latest-state: corpus-search the person or topic. The corpus holds recent meetings and chats.
+- Gather at run start: inbox, calendar, web.
 - Calendar is the source of truth for travel; booking-confirmation emails are not action items.
 
 ## Inbox noise filter (skip): newsletters (Medium/NYT/Guardian/Daily Stoic), LinkedIn job alerts

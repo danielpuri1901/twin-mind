@@ -1,0 +1,7 @@
+[Unit]
+Description=Append the twin conversations to the corpus (incremental, idempotent)
+
+[Service]
+Type=oneshot
+User=ec2-user
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/pipeline/ingest_twin_chat.py

@@ -25,20 +25,25 @@ CHANGELOG = os.path.join(REPO, "docs", "CHANGELOG.md")
 STATE = os.path.expanduser("~/.twin-mind/state/weekly-recap-nudge.json")
 
 
-def week_headlines(days=7):
-    """The `## YYYY-MM-DD - title` headlines from the last `days` days (deterministic, no LLM)."""
+def week_headlines(days=7, limit=120):
+    """One headline per CHANGELOG entry from the last `days` days (deterministic, no LLM).
+    `## YYYY-MM-DD - title` gives the title; a bare `## YYYY-MM-DD` gives the first non-empty line below it."""
     cutoff = datetime.now(TZ).date() - timedelta(days=days)
-    heads = []
+    heads, wait = [], False
     for line in open(CHANGELOG):
-        m = re.match(r"^##\s+(\d{4}-\d{2}-\d{2})\s*(?:\([^)]*\))?\s*-\s*(.+)", line)
-        if not m:
-            continue
-        try:
-            if datetime.strptime(m.group(1), "%Y-%m-%d").date() >= cutoff:
+        m = re.match(r"^##\s+(\d{4}-\d{2}-\d{2})\s*(?:\([^)]*\))?\s*(?:-\s*(.+))?$", line.strip())
+        if m:
+            try:
+                recent = datetime.strptime(m.group(1), "%Y-%m-%d").date() >= cutoff
+            except ValueError:
+                recent = False
+            wait = recent and not m.group(2)
+            if recent and m.group(2):
                 heads.append(m.group(2).strip())
-        except ValueError:
-            continue
-    return heads
+        elif wait and line.strip() and not line.startswith("#"):
+            heads.append(line.strip())
+            wait = False
+    return [h if len(h) <= limit else h[:limit - 3].rstrip() + "..." for h in heads]
 
 
 def build_message():

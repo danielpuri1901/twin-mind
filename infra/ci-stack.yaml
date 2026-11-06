@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Twin Mind image pipeline. GitHub Actions builds images on main and pushes them to ECR. The box pulls them by tag. The laptop deploys by tag and never builds.
+
+Resources:
+  ImageRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: twin-mind
+      # A commit tag can never point at different contents. Only the live pointers and the
+      # build cache may move.
+      ImageTagMutability: IMMUTABLE_WITH_EXCLUSION
+      ImageTagMutabilityExclusionFilters:
+        - ImageTagMutabilityExclusionFilterType: WILDCARD
+          ImageTagMutabilityExclusionFilterValue: "live-*"
+        - ImageTagMutabilityExclusionFilterType: WILDCARD
+          ImageTagMutabilityExclusionFilterValue: "buildcache-*"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      # ECR evaluates rules by priority, and an image a higher rule selects cannot be expired by a
+      # lower one, so what is deployed survives any number of pushes.
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules": [
+            {"rulePriority": 1, "description": "Never expire the deployed images",
+             "selection": {"tagStatus": "tagged", "tagPrefixList": ["live-"], "countType": "imageCountMoreThan", "countNumber": 2},
+             "action": {"type": "expire"}},
+            {"rulePriority": 2, "description": "Keep the last 10 job images",
+             "selection": {"tagStatus": "tagged", "tagPrefixList": ["jobs-"], "countType": "imageCountMoreThan", "countNumber": 10},
+             "action": {"type": "expire"}},
+            {"rulePriority": 3, "description": "Keep the last 10 chat images",
+             "selection": {"tagStatus": "tagged", "tagPrefixList": ["chat-"], "countType": "imageCountMoreThan", "countNumber": 10},
+             "action": {"type": "expire"}},
+            {"rulePriority": 4, "description": "Expire untagged layers after 7 days",
+             "selection": {"tagStatus": "untagged", "countType": "sinceImagePushed", "countUnit": "days", "countNumber": 7},
+             "action": {"type": "expire"}}
+          ]}
+
+  # Only a workflow on the main branch of this repository can assume this role. Pull requests and
+  # forks get a different token subject and are refused. No AWS key is stored in GitHub.
+  # GitHub can name a repo by owner and repo ids as well as names (AgentLab saw this in CloudTrail on
+  # 2026-10-04). The id form also stops a deleted and re-created repo with the same name.
+  GitHubImagesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: twin-mind-github-images
+      Description: Lets the main branch of the twin-mind repository push images to its ECR repository.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRoleWithWebIdentity
+            Principal:
+              Federated: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+                "token.actions.githubusercontent.com:sub":
+                  - "repo:danielpuri1901/twin-mind:ref:refs/heads/main"
+                  - "repo:danielpuri1901@123932678/twin-mind@1327984203:ref:refs/heads/main"
+      Policies:
+        - PolicyName: push-twin-mind-images
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EcrLogin # GetAuthorizationToken has no resource-level permissions.
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EcrPushPull # Push the image and the build cache, and pull the cache back.
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !GetAtt ImageRepository.Arn
+
+  # The box pulls images. It cannot push them.
+  BoxPullImages:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      RoleName: twin-mind-role
+      PolicyName: pull-twin-mind-images
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EcrLogin
+            Effect: Allow
+            Action: ecr:GetAuthorizationToken
+            Resource: "*"
+          - Sid: EcrPull
+            Effect: Allow
+            Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Resource: !GetAtt ImageRepository.Arn
+
+Outputs:
+  RepositoryUri:
+    Value: !GetAtt ImageRepository.RepositoryUri
+  GitHubImagesRoleArn:
+    Value: !GetAtt GitHubImagesRole.Arn

@@ -1,0 +1,11 @@
+# Only what the Dockerfile copies is sent to the builder. No secrets, no private notes.
+*
+!agents
+!shared
+!pipeline
+!evals
+!docs/CHANGELOG.md
+!infra/bin
+!infra/box-requirements.txt
+**/__pycache__
+**/.env

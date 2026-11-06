@@ -1,0 +1,9 @@
+[Unit]
+Description=Sync the corpus to S3 every 6 hours
+
+[Timer]
+OnCalendar=*-*-* 02,08,14,20:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

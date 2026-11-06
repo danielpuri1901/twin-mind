@@ -1,0 +1,8 @@
+[Unit]
+Description=Twin Mind - weekly recap done-gated poll (compose+send once Daniel says done)
+[Service]
+Type=oneshot
+User=ec2-user
+Environment=HOME=/home/ec2-user
+WorkingDirectory=/home/ec2-user/super-project
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/agents/weekly-recap/tools/send_recap.py
