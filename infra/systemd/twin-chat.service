@@ -12,6 +12,9 @@ Environment=PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin
 Environment=DISABLE_AUTOUPDATER=1
 Environment=DO_NOT_TRACK=1
 Environment=LETTA_CODE_TELEM=0
+Environment=LETTA_CHANNEL_CREDENTIALS_STORE=file
+ExecStartPre=+/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/infra/bin/twin_chat_write_key.py
+EnvironmentFile=-/run/twin-chat/anthropic.env
 ExecStart=/opt/letta/bin/letta server --backend local --channels telegram
 Restart=always
 RestartSec=10

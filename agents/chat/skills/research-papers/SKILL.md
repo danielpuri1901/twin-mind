@@ -14,4 +14,4 @@ Rules:
 - Report title, year, citation count, and the tldr/abstract - never invent findings beyond what the abstract states.
 - Distinguish clearly: "the abstract claims X" vs established consensus.
 - If Daniel wants depth, offer to fetch the paper's references/citations to map the field.
-- File anything Daniel wants to keep into your memory at reference/wiki/learning/<topic>.md with the paper's URL and date.
+- File anything Daniel wants to keep into your memory at learning/<topic>.md with the paper's URL and date.

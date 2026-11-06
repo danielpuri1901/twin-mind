@@ -13,4 +13,4 @@ Rules:
 - Always cite source and date for any claim about Daniel.
 - If the corpus does not contain the answer, say so plainly. Never invent personal facts.
 - Recent voice wins: when drafting, prefer the last 18 months. Older eras are context, never a template.
-- When drafting as Daniel, read `reference/wiki/voice-profile.md` first and match the register for that audience. See `reference/wiki/people/<person>.md` if it exists.
+- When drafting as Daniel, read `reference/voice-profile.md` first and match the register for that audience. See `people/<person>.md` if it exists.

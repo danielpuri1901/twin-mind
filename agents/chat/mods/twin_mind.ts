@@ -2,7 +2,7 @@
  * Twin Mind's only bridge to the Letta harness. It gives chat four things:
  *
  *   - turn_start: the current time and auto-retrieved corpus context on every Telegram message.
- *   - tools: corpus_search, email_search, web_search and web_fetch. Web fetch asks Daniel each time.
+ *   - tools: corpus_search, code_search, email_search, web_search and web_fetch. Web fetch asks Daniel each time.
  *   - chat log: every Telegram message and reply, the contract in shared/chat_log.py.
  *   - shell policy: no shell, except the memory repo commands that dreaming needs.
  *
@@ -19,6 +19,7 @@ import { appendFileSync } from "node:fs";
 const PYTHON = "/home/ec2-user/.twin-mind/venv/bin/python";
 const REPO = "/home/ec2-user/super-project";
 const CHAT_LOG = "/var/lib/twin-chat/chat-log.jsonl";
+const CODE_COPY = "/home/twin-chat/twin-mind";
 const TIME_ZONE = "Europe/Amsterdam";
 const ALL_TURNS = process.env.TWIN_MOD_ALL_TURNS === "1"; // preflight only: treat CLI prompts as chat
 
@@ -86,22 +87,33 @@ async function contextFor(message) {
   return lines.join("\n\n");
 }
 
-/** Remove heredoc bodies, so memory text that mentions curl is not read as running curl. */
-function withoutHeredocs(command) {
-  return command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\b/g, "");
+/** Remove memory text and commit messages, so mentioning curl is not read as running curl. */
+function withoutData(command) {
+  return command
+    .replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\b/g, "")
+    .replace(/(^|\s)(-m|--message|--author=?)\s*("(?:[^"\\]|\\.)*"|'[^']*')/g, " ");
 }
 
-const SHELL_DENIED = /\b(curl|wget|nc|ncat|ssh|scp|rsync|sudo|su|python\d*|node|npm|npx|bun|perl|ruby|aws)\b|\/dev\/tcp|\bgit\s+(push|remote|clone|fetch|pull|config)\b/;
+const SHELL_DENIED = /\b(curl|wget|nc|ncat|ssh|scp|rsync|sudo|su|env|printenv|set|export|bash|sh|zsh|eval|exec|python\d*|node|npm|npx|bun|perl|ruby|aws)\b|\/dev\/tcp|\/proc\b|\/run\b|\/etc\b|\/home\/(?!twin-chat\b)|\.\.\/|ANTHROPIC|\bgit\s+(push|remote|clone|fetch|pull|config)\b/;
 
 /** Only memory-repo work may use a shell. Everything else has a tool. */
 export function shellVerdict(command, cwd) {
   const inMemory = /\$\{?MEMORY_DIR\b|\/memfs\//.test(command) || String(cwd ?? "").includes("/memfs/");
   if (!inMemory) return "Shell is off for this agent. Use Read, Grep, Glob or the corpus_search, email_search, web_search and web_fetch tools.";
-  if (SHELL_DENIED.test(withoutHeredocs(command))) return "That command is not allowed in the memory repo.";
+  if (SHELL_DENIED.test(withoutData(command))) return "That command is not allowed in the memory repo.";
   return null;
 }
 
-const SECRET_PATH = /\/\.letta\/(lc-local-backend\/providers|channels)\b|\/auth\.json$|\/\.ssh\b|\/\.env\b/;
+const KEY_UNSET_TEXT = "unset ANTHROPIC_API_KEY; ";
+const KEY_UNSET = new RegExp(`^${KEY_UNSET_TEXT}`);
+
+// These run code or commands, or act outside this conversation, around the shell rule.
+const DENIED_TOOLS = new Set([
+  "CodeMode", "Workflow", "Monitor", "WatchPR", "SendAgentMessage", "EnterWorktree", "ExitWorktree",
+  "SetWorkingDirectory", "exec_command", "write_stdin", "ApplyPatch",
+]);
+
+const SECRET_PATH =/^\/run\/|^\/proc\/|\/\.letta\/(lc-local-backend\/providers|channels)\b|\/auth\.json$|\/\.ssh\b|\/\.env\b/;
 const WRITE_TOOL = /^(write|edit|multi_?edit|apply_?patch|str_?replace|insert|notebook_?edit|replace)/i;
 
 /** File tools cannot read stored credentials, and can only write inside the memory repo. */
@@ -152,6 +164,10 @@ export default function activate(letta) {
   }));
 
   disposers.push(letta.events.on("tool_start", (event) => {
+    if ((event.toolName === "Bash" || event.toolName === "shell") && typeof event.args?.command === "string") {
+      event.args = { ...event.args, command: `${KEY_UNSET_TEXT}${event.args.command}` };
+      return;
+    }
     if (event.toolName !== "MessageChannel") return;
     const { action, message } = event.args ?? {};
     if ((action === "send" || !action) && typeof message === "string" && message.trim()) {
@@ -163,10 +179,16 @@ export default function activate(letta) {
     id: "twin-mind-shell-policy",
     description: "No shell for chat except in its own memory repo. No credential reads. Writes only to memory.",
     check(event) {
-      const verdict = event.toolName === "Bash" || event.toolName === "shell"
-        ? shellVerdict(String(event.args?.command ?? ""), event.cwd)
+      if (DENIED_TOOLS.has(event.toolName)) {
+        return { decision: "deny", reason: `${event.toolName} is off for this agent.` };
+      }
+      const isShell = event.toolName === "Bash" || event.toolName === "shell";
+      const verdict = isShell
+        ? shellVerdict(String(event.args?.command ?? "").replace(KEY_UNSET, ""), event.cwd)
         : fileVerdict(event.toolName, event.args);
-      return verdict ? { decision: "deny", reason: verdict } : undefined;
+      if (verdict) return { decision: "deny", reason: verdict };
+      // This policy is stricter than Letta's own memory check, so what passes needs no prompt.
+      return isShell || WRITE_TOOL.test(event.toolName) ? { decision: "allow", reason: "own memory repo" } : undefined;
     },
   }));
 
@@ -190,6 +212,25 @@ export default function activate(letta) {
       }
       return runAsJobUser("shared/corpus_search.py", [...flags, "--", String(args.query)], { signal });
     },
+  }));
+
+  disposers.push(tool(letta, {
+    name: "code_search",
+    description: "Search the read-only copy of the Twin Mind code and docs with a grep pattern. Returns file, line number and text. Open a file with Read.",
+    properties: { pattern: { type: "string" } },
+    required: ["pattern"],
+    requiresApproval: false,
+    run: (args, signal) => new Promise((resolve, reject) => {
+      execFile(
+        "grep",
+        ["-rnIi", "--exclude-dir=.git", "-m", "8", "-e", String(args.pattern), CODE_COPY],
+        { signal, timeout: 15000, maxBuffer: 4 * 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error && error.code !== 1) reject(new Error(String(stderr).trim() || error.message));
+          else resolve(String(stdout).slice(0, 12000));
+        },
+      );
+    }),
   }));
 
   disposers.push(tool(letta, {
