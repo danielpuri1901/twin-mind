@@ -10,15 +10,18 @@ Anatomy (Anthropic "Demystifying evals for agents", adopted 2026-07-08):
                       line, and it must match the gold verdict (deterministic)
     2. model-based  : temp-0 judge scores each gold_behavior assertion pass/fail
   tracked_metrics  : latency_s, output_tokens per trial
+Rules under test: the needs_you_today bullet of SYS in agents/brief/tools/compose_brief.py (the live
+brief prompt). Its source_id/evidence_quote/state fields do not apply to one email and are ignored.
+A gold that says "if anything" needs no yes/no verdict; its judged assertions still must pass.
 Scope note: this replays the JUDGMENT policy (rules + model), not the full Hermes
 harness; outcome-grading applies to the live brief (inbox/heartbeat checks), not here.
 Regression semantics: suite target is 100% - any failing item = alarm, fix before ship.
 
 Run with Hermes venv python (has anthropic + langfuse): needs a live AWS session
 for the key lookup, see shared/claude.py.
-  ~/.hermes/hermes-agent/venv/bin/python tools/run_triage.py [--trials 3]
+  ~/.hermes/hermes-agent/venv/bin/python evals/run_regression.py [--trials 3]
 """
-import argparse, json, os, re, sys, time
+import argparse, ast, json, os, re, sys, time
 
 from pydantic import BaseModel
 
@@ -31,16 +34,17 @@ MODEL = os.environ.get("TWIN_TASK_MODEL", "claude-sonnet-5-5")
 JUDGE_MODEL = "claude-sonnet-4-6"  # the ruler NEVER varies with the candidate
 
 def _load_production_rules():
-    """Extract the decision rules FROM the deployed skill so the gate tests the
-    PRODUCTION text, not a paraphrase (stepback #5: 'the gate evaluated a prompt
-    that is not the one in production')."""
-    skill = open(os.path.join(HERE, "agents/brief/SKILL.md")).read()
-    # v3 anchor: the decision rules live inside section 1 (NEEDS YOU TODAY)
-    start = skill.index("1. NEEDS YOU TODAY")
-    end = skill.index("2. TODAY")
-    block = "Rules (from the production skill, section 1):\n" + skill[start:end]
-    return ("You are Twin Mind, deciding for each email: does Daniel need to act on this or not.\n"
-            + block +
+    """Take the decision rules FROM the live brief prompt (SYS in compose_brief.py), so the gate
+    tests the text that ships. Read with ast, not import: importing compose_brief pulls in
+    prefetch, the corpus and the Langfuse judges. Raises loudly if SYS or its bullet moves."""
+    src = open(os.path.join(HERE, "agents/brief/tools/compose_brief.py")).read()
+    sys_prompt = next(ast.literal_eval(n.value) for n in ast.parse(src).body
+                      if isinstance(n, ast.Assign) and n.targets[0].id == "SYS")
+    start = sys_prompt.index("- needs_you_today:")
+    end = sys_prompt.index("- ai_advancements:")
+    return ("You are Twin Mind, deciding for ONE email: does Daniel need to act on this or not.\n"
+            "Rules (from the live brief prompt, needs_you_today bullet; ignore its source_id, "
+            "evidence_quote and state fields here):\n" + sys_prompt[start:end] +
             "\nGiven the evidence, decide via the tool: actionable yes/no, plus 2-4 sentences of "
             "judgment on the current state and what (if anything) belongs in the brief.")
 
@@ -111,6 +115,8 @@ def code_grader(decision, expected_output):
         if not m:
             return False, "missing verdict line"
         got = m.group(1).lower()
+    if "if anything" in expected_output:   # gold itself hedges: yes/no is ambiguous, the assertions decide
+        return True, "no verdict required (gold says 'if anything')"
     # gold side stays a regex - that reads the DATASET text, not an LLM output
     gold = "no" if re.search(r"NOT actionable|no nudge|no action", expected_output, re.I) else "yes"
     return got == gold, f"verdict={got} gold={gold}"
