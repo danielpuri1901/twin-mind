@@ -114,9 +114,9 @@ def main():
     print('PASS tagged profiles and $50 project/account budgets; billing totals require later reconciliation')
 
     users = {u['UserName'] for u in aws('iam', 'list-users')['Users']}
-    assert not users.intersection({'nathan-bedrock', 'daniel-iam', 'BedrockAPIKey-150t'})
-    assert {'daniel-admin', 'BedrockAPIKey-edsw'}.issubset(users)
-    print('PASS dormant IAM cleanup; live judge user retained')
+    assert not users.intersection({'nathan-bedrock', 'daniel-iam', 'BedrockAPIKey-150t', 'BedrockAPIKey-edsw'})
+    assert 'daniel-admin' in users
+    print('PASS dormant IAM cleanup; no Bedrock key users remain')
 
 
 if __name__ == '__main__':
