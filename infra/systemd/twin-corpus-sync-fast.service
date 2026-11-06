@@ -1,0 +1,12 @@
+[Unit]
+Description=Twin corpus fast sync - append-only jsonl to S3
+
+[Service]
+Type=oneshot
+User=ec2-user
+# Re-export the canonical tree first. It is generated FROM the index and is the
+# only copy of the records that exist nowhere else, so a sync of a stale export
+# would back up a corpus that is missing the last 15 minutes of conversation.
+ExecStartPre=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/pipeline/export_canonical_corpus.py
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/shared/corpus_sync.py --fast
+WorkingDirectory=/home/ec2-user/super-project

@@ -1,0 +1,8 @@
+[Unit]
+Description=Twin Mind - send the ChatServerUp heartbeat when chat and its Telegram gateway run
+
+[Service]
+Type=oneshot
+User=ec2-user
+Environment=PATH=/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/ec2-user/super-project/infra/bin/chat_alive.py

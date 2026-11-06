@@ -1,0 +1,9 @@
+[Unit]
+Description=Twin Mind - chat-alive heartbeat (*:0/15)
+
+[Timer]
+OnCalendar=*:0/15
+Unit=twin-chat-alive.service
+
+[Install]
+WantedBy=timers.target

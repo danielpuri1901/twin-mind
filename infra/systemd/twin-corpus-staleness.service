@@ -1,0 +1,8 @@
+[Unit]
+Description=Twin Mind corpus staleness check
+
+[Service]
+Type=oneshot
+User=ec2-user
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/shared/corpus_staleness.py
+Environment=PATH=/home/ec2-user/.hermes/bin:/usr/local/bin:/usr/bin:/bin
