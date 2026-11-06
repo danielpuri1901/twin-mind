@@ -1,0 +1,20 @@
+[Unit]
+Description=Twin Mind - chat agent on Letta, reached through Telegram
+After=network-online.target twin-chat-block-metadata.service
+Wants=network-online.target
+Requires=twin-chat-block-metadata.service
+
+[Service]
+User=twin-chat
+WorkingDirectory=/home/twin-chat/workspace
+Environment=HOME=/home/twin-chat
+Environment=PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin
+Environment=DISABLE_AUTOUPDATER=1
+Environment=DO_NOT_TRACK=1
+Environment=LETTA_CODE_TELEM=0
+ExecStart=/opt/letta/bin/letta server --backend local --channels telegram
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

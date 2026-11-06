@@ -1,0 +1,7 @@
+[Unit]
+Description=Twin Mind - archive the chat agent's memory and conversations for the corpus sync
+
+[Service]
+Type=oneshot
+UMask=0027
+ExecStart=/bin/sh -c 'tar czf /var/lib/twin-chat/letta-state.tmp.tar.gz -C /home/twin-chat --exclude=.letta/lc-local-backend/providers --exclude=.letta/channels --exclude=.letta/mods --exclude=node_modules --exclude="*.sock" .letta && mv /var/lib/twin-chat/letta-state.tmp.tar.gz /var/lib/twin-chat/letta-state.tar.gz && chgrp ec2-user /var/lib/twin-chat/letta-state.tar.gz'

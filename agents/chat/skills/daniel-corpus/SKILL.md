@@ -1,19 +1,16 @@
 ---
 name: daniel-corpus
-description: Search and cite Daniel's personal corpus (messages, email, transcripts, calendar, wiki)
+description: Search and cite Daniel's personal corpus (messages, meetings, calendar, contacts, past chats)
 ---
-Daniel's personal corpus lives at ~/twin-corpus/.
-Coverage: 2017-2026 across 6 sources (iMessage, Gmail, Google Chat, calendar, contacts, meeting transcripts). See wiki/index.md for per-source windows.
+Coverage: 2017 to now. Use only the `corpus_search` tool. Never read corpus files or databases directly.
 
-Retrieval - use ONLY this contract (the backend is swappable; never raw SQL, never grep the JSONL):
-  corpus-search "<query>" [--k 20] [--mode hybrid|lexical|semantic] [--chat <person>] [--who me|them] [--since YYYY-MM-DD] [--until YYYY-MM-DD]
-  Returns JSON lines: {source, chat, date, who, sender, text, score}.
-- Default mode is hybrid (lexical + semantic fusion) - the eval-chosen default for questions about Daniel's life.
-- For "how does Daniel write to X": corpus-search "<topic>" --chat <person> --who me (recent exemplars).
+Results are JSON lines: {source, chat, date, who, sender, text, score}.
+
+- Retrieval is hybrid, the eval-chosen default for questions about Daniel's life.
+- For "how does Daniel write to X": call `corpus_search` with `chat` set to the person and `who` set to `me`.
 
 Rules:
-- Always cite source + date for any claim about Daniel.
-- If the corpus does not contain the answer, say so plainly; never invent personal facts.
-- Recent voice wins: when drafting, prefer exemplars from the last ~18 months; older eras are context, never template.
-- When drafting as Daniel, read wiki/voice-profile.md first and match the register for THAT audience (see wiki/people/<person>.md if it exists).
-- Do NOT edit this skill yourself; propose changes to Daniel instead (this file is version-controlled in his project repo).
+- Always cite source and date for any claim about Daniel.
+- If the corpus does not contain the answer, say so plainly. Never invent personal facts.
+- Recent voice wins: when drafting, prefer the last 18 months. Older eras are context, never a template.
+- When drafting as Daniel, read `reference/wiki/voice-profile.md` first and match the register for that audience. See `reference/wiki/people/<person>.md` if it exists.

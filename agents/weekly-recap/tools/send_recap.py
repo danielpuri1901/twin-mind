@@ -13,7 +13,6 @@ import argparse
 import json
 import os
 import re
-import sqlite3
 import subprocess
 import sys
 import time
@@ -22,12 +21,13 @@ from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "..", "shared")))
 import recap as R  # reuse changelog_week, meetings_week, compose
+import chat_log  # noqa: E402
 
 TZ = ZoneInfo("Europe/Luxembourg")
-STATEDB = os.path.expanduser("~/.hermes/state.db")
-NUDGE_STATE = os.path.expanduser("~/.hermes/state/weekly-recap-nudge.json")
-SENT_MARKER = os.path.expanduser("~/.hermes/state/weekly-recap-sent.txt")
+NUDGE_STATE = os.path.expanduser("~/.twin-mind/state/weekly-recap-nudge.json")
+SENT_MARKER = os.path.expanduser("~/.twin-mind/state/weekly-recap-sent.txt")
 SEND_EMAIL = os.path.normpath(os.path.join(HERE, "..", "..", "brief", "tools", "send_email.py"))
 CUTOFF_MIN = 90
 DONE = {"done", "/done", "send", "send it", "sent", "finished", "im done", "i'm done", "im finished",
@@ -44,13 +44,10 @@ def is_done(m):
 
 
 def messages_since(nudge_ts):
-    if not os.path.exists(STATEDB) or not nudge_ts:
+    if not nudge_ts:
         return []
-    db = sqlite3.connect(STATEDB)
-    return [r[0] for r in db.execute(
-        "SELECT m.content FROM messages m JOIN sessions s ON m.session_id = s.id "
-        "WHERE s.source = 'telegram' AND m.role = 'user' AND m.timestamp >= ? "
-        "AND COALESCE(m.content, '') != '' ORDER BY m.timestamp", (float(nudge_ts),)).fetchall()]
+    return [m["text"] for m in chat_log.read()
+            if m.get("role") == "user" and m.get("text") and float(m.get("ts", 0)) >= float(nudge_ts)]
 
 
 def week_key():

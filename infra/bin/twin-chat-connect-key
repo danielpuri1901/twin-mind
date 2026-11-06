@@ -1,0 +1,8 @@
+#!/bin/sh
+# Store the chat agent's own Anthropic key in Letta. The key is typed at a hidden prompt, so it
+# never appears in a command line, the shell history or any AI tool's context.
+printf 'Paste the chat Anthropic API key (input hidden): '
+stty -echo; read -r KEY; stty echo; echo
+[ -n "$KEY" ] || { echo "No key entered."; exit 1; }
+twin-chat-letta --backend local connect anthropic --api-key "$KEY"
+unset KEY

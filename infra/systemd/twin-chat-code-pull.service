@@ -1,0 +1,8 @@
+[Unit]
+Description=Twin Mind - refresh the chat agent's read-only copy of the public code
+
+[Service]
+Type=oneshot
+User=twin-chat
+Environment=HOME=/home/twin-chat
+ExecStart=/usr/bin/git -C /home/twin-chat/twin-mind pull --ff-only --quiet

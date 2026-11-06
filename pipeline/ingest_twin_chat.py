@@ -1,20 +1,13 @@
 """Append the twin's own conversations to the corpus, on a timer.
 
-Replaces the session-close hook, which never fired in practice. The first
-design cut the day by restarting the gateway at 04:00, on the assumption that
-a restart ends the session and fires `on_session_finalize`. It does not: the
-session opened 2026-07-20 survived the 2026-09-24 restart and only ended when
-Daniel sent /reset on 2026-09-25. So for five nights the restart produced a
-Telegram notification and no boundary, while 122 real messages sat in
-state.db unindexed.
+Memory should not depend on a session ever ending. This reads the chat log
+(shared/chat_log.py) every half hour, takes the messages it has not seen, and
+appends them to the corpus. A conversation becomes searchable within the hour
+whether or not the session closes, and there is nothing to restart. Until
+2026-11-06 it read Hermes's state.db; everything there was drained first.
 
-Memory should not depend on a session ever ending. This reads state.db every
-half hour, takes the messages it has not seen, and appends them to the
-corpus. A conversation becomes searchable within the hour whether or not the
-session closes, and there is nothing to restart.
-
-Idempotent on message id, which is the row id Hermes assigns. The ledger
-lives in corpus.db so the write and its bookkeeping share one transaction.
+Idempotent on message id, the log line number. The ledger lives in corpus.db
+so the write and its bookkeeping share one transaction.
 
 Run with --dry-run to see what it would take without writing.
 """
@@ -27,12 +20,13 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
+import chat_log  # noqa: E402
+
 CORPUS = os.environ.get("TWIN_CORPUS_DIR") or os.path.expanduser("~/twin-corpus")
-STATE_DB = os.environ.get("HERMES_STATE_DB") or os.path.expanduser("~/.hermes/state.db")
 FTS_DB = os.path.join(CORPUS, "index", "corpus.db")
 VEC_DB = os.path.join(CORPUS, "index", "vectors.db")
 JSONL = os.path.join(CORPUS, "normalized", "twin-chat.jsonl")
-LEGACY_DONE = os.path.join(CORPUS, "normalized", ".twin-chat-ingested")
 EMBED_MODEL = "cohere.embed-multilingual-v3"
 # Must equal shared/embedding.MAX_CHARS. Pinned by evals/test_embedding_contract.py,
 # which fails if any writer drifts.
@@ -64,53 +58,26 @@ def ensure_ledger(fts):
     fts.commit()
 
 
-def seed_from_legacy(fts, state):
-    """One-time migration: the 2026-09-24 backfill recorded whole sessions, not
-    message ids. Mark every message of those sessions as done, or this job
-    would insert all 187 records a second time."""
-    if fts.execute("SELECT 1 FROM twin_chat_ingested LIMIT 1").fetchone():
-        return 0
-    try:
-        sessions = [ln.strip() for ln in open(LEGACY_DONE) if ln.strip()]
-    except FileNotFoundError:
-        return 0
-    if not sessions:
-        return 0
-    marks = []
-    for sid in sessions:
-        marks += [r[0] for r in state.execute(
-            "SELECT id FROM messages WHERE session_id=?", (sid,))]
-    fts.executemany("INSERT OR IGNORE INTO twin_chat_ingested VALUES (?)",
-                    [(m,) for m in marks])
-    fts.commit()
-    return len(marks)
-
-
-def pending(state, fts):
+def pending(messages, fts):
     """Messages worth keeping that the ledger has not seen."""
     done = {r[0] for r in fts.execute("SELECT message_id FROM twin_chat_ingested")}
-    rows = state.execute(
-        "SELECT m.id, m.session_id, m.role, m.content, m.timestamp, s.source "
-        "FROM messages m JOIN sessions s ON s.id = m.session_id "
-        "WHERE s.source = 'telegram' ORDER BY m.timestamp").fetchall()
     out = []
-    for mid, sid, role, content, ts, _src in rows:
-        if mid in done:
+    for message in messages:
+        if message["id"] in done:
             continue
-        text = (content or "").strip()
-        # Tool calls and system turns are not things anyone said.
+        role, text = message.get("role"), (message.get("text") or "").strip()
         if role not in ("user", "assistant") or not text:
             continue
         if is_boilerplate(role, text):
             continue
         try:
-            date = datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
+            date = datetime.fromtimestamp(float(message.get("ts")), timezone.utc).isoformat()
         except (TypeError, ValueError):
-            date = str(ts)[:32]
-        out.append({"message_id": mid, "source": SOURCE, "chat": "twin", "date": date,
+            date = str(message.get("ts"))[:32]
+        out.append({"message_id": message["id"], "source": SOURCE, "chat": "twin", "date": date,
                     "who": "me" if role == "user" else "twin",
                     "sender": "Daniel" if role == "user" else "Twin Mind",
-                    "text": text, "session_id": sid})
+                    "text": text, "session_id": message.get("conversation_id")})
     return out
 
 
@@ -150,14 +117,10 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    state = sqlite3.connect(f"file:{STATE_DB}?mode=ro", uri=True)
     fts = sqlite3.connect(FTS_DB, timeout=30)
     ensure_ledger(fts)
-    seeded = seed_from_legacy(fts, state)
-    if seeded:
-        print(f"seeded ledger with {seeded} message ids from the 2026-09-24 backfill")
 
-    recs = pending(state, fts)
+    recs = pending(chat_log.read(), fts)
     print(f"pending records: {len(recs)}")
     if args.dry_run:
         for r in recs[:5]:

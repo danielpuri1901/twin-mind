@@ -1,0 +1,11 @@
+[Unit]
+Description=Twin Mind - stop the chat agent's OS user reaching the instance role
+Before=twin-chat.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '/usr/sbin/iptables -C OUTPUT -m owner --uid-owner twin-chat -d 169.254.169.254 -j REJECT 2>/dev/null || /usr/sbin/iptables -I OUTPUT -m owner --uid-owner twin-chat -d 169.254.169.254 -j REJECT'
+
+[Install]
+WantedBy=multi-user.target

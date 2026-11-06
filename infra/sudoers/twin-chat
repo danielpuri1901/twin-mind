@@ -1,0 +1,7 @@
+# The chat agent's OS user may run these read-only commands as the job user, and nothing else.
+# The scripts are owned by the job user, and the fixed script path comes before any argument.
+Defaults:twin-chat !requiretty, env_reset
+twin-chat ALL=(ec2-user) NOPASSWD: /home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/shared/corpus_search.py *, \
+  /home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/shared/email_search.py *, \
+  /home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/agents/chat/tools/web_tools.py *, \
+  /home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/agents/chat/tools/corpus_context.py

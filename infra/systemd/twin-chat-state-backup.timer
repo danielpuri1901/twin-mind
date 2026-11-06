@@ -1,0 +1,9 @@
+[Unit]
+Description=Twin Mind - archive chat state before each full corpus sync
+
+[Timer]
+OnCalendar=*-*-* 02,08,14,20:15:00
+Unit=twin-chat-state-backup.service
+
+[Install]
+WantedBy=timers.target

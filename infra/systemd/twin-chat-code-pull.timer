@@ -1,0 +1,9 @@
+[Unit]
+Description=Twin Mind - refresh the chat agent's code copy daily
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Unit=twin-chat-code-pull.service
+
+[Install]
+WantedBy=timers.target

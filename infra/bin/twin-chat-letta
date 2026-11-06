@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run the Letta CLI as the chat agent's OS user. Usage: twin-chat-letta <letta args>
+exec sudo -n -u twin-chat -H env HOME=/home/twin-chat PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin \
+  DISABLE_AUTOUPDATER=1 DO_NOT_TRACK=1 LETTA_CODE_TELEM=0 sh -c 'cd /home/twin-chat/workspace && exec /opt/letta/bin/letta "$@"' letta "$@"
