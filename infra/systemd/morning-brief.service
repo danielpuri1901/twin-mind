@@ -1,0 +1,13 @@
+[Unit]
+Description=Twin Mind - compose and email the morning brief
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ec2-user
+WorkingDirectory=/home/ec2-user/super-project
+EnvironmentFile=/home/ec2-user/.twin-mind/.env
+Environment=PATH=/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=TWIN_CORPUS=/home/ec2-user/twin-corpus
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python shared/telegram_send.py --run /home/ec2-user/.twin-mind/venv/bin/python agents/brief/tools/compose_brief.py

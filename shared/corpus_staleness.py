@@ -38,7 +38,6 @@ import argparse
 import json
 import os
 import sqlite3
-import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -56,7 +55,8 @@ MIN_EMBED_CHARS = 12
 # corpus keeps Daniel's own sent mail as voice, and freshness is fetched on
 # demand rather than bulk-ingested. iMessage and Google Chat he no longer
 # uses. Their history stays in the corpus and stays searchable.
-ARCHIVED = {"gmail", "imessage", "gchat", "contacts", "gcal"}
+# `transcript` is the Granola history, retired in 2026-09; meetings now arrive as `meeting`.
+ARCHIVED = {"gmail", "imessage", "gchat", "contacts", "gcal", "transcript"}
 
 # Live sources, with the days of silence that mean something is wrong. The
 # rhythms differ: meetings land most working days, twin-chat every day he
@@ -157,11 +157,9 @@ def format_alert(stale) -> str:
 
 def send(text: str) -> bool:
     try:
-        proc = subprocess.run(
-            ["hermes", "send", "-t", "telegram", text],
-            capture_output=True, text=True, timeout=60, env=os.environ,
-        )
-        return proc.returncode == 0
+        import telegram_send
+        telegram_send.send(text)
+        return True
     except Exception as exc:
         print(f"staleness alert send failed: {exc}", file=sys.stderr)
         return False

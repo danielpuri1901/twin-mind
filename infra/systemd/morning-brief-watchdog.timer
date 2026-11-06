@@ -1,0 +1,9 @@
+[Unit]
+Description=Twin Mind - check that this morning's brief arrived and is well formed (*-*-* 07:50:00)
+
+[Timer]
+OnCalendar=*-*-* 07:50:00
+Unit=morning-brief-watchdog.service
+
+[Install]
+WantedBy=timers.target

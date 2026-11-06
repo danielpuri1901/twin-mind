@@ -57,7 +57,7 @@ def format_fails(subj, body, today):
 
 
 def main():
-    for line in open(os.path.expanduser("~/.hermes/.env")):
+    for line in open(os.path.expanduser("~/.twin-mind/.env")):
         if "=" in line and not line.strip().startswith("#"):
             k, v = line.strip().split("=", 1)
             os.environ.setdefault(k, v)
@@ -89,7 +89,7 @@ def main():
                 fails += format_fails(subj, body, today)
                 # covered-topic repeat (reads the state file, so it lives here not in format_fails)
                 try:
-                    cov = open(os.path.expanduser("~/.hermes/state/digest-covered.txt")).read()
+                    cov = open(os.path.expanduser("~/.twin-mind/state/digest-covered.txt")).read()
                     first_words = [l.split("(")[0].strip()[:25] for l in cov.splitlines() if len(l) > 15]
                     hits = [t for t in first_words if t and t.lower() in (body or "").lower()]
                     if hits:
@@ -130,22 +130,6 @@ def main():
             fails.append(f"no heartbeat in last 12h (metric said: {r.stdout.strip()!r})")
     except Exception as e:
         fails.append(f"heartbeat check errored: {e}")
-
-    # skill-guard: catch the twin self-authoring a skill (the 2026-07-13 incident).
-    # Our governed skills are symlinks. The gateway's bundled skills are category dirs
-    # holding a DESCRIPTION.md (no SKILL.md). A twin-authored skill has a top-level
-    # SKILL.md - that is the rogue signal (robust to the bundled set changing).
-    try:
-        skills_dir = os.path.expanduser("~/.hermes/skills")
-        if os.path.isdir(skills_dir):
-            rogue = [d for d in os.listdir(skills_dir)
-                     if not os.path.islink(os.path.join(skills_dir, d))
-                     and not d.startswith(".")
-                     and os.path.exists(os.path.join(skills_dir, d, "SKILL.md"))]
-            if rogue:
-                fails.append(f"UNAUTHORIZED twin-authored skill(s) appeared: {rogue}")
-    except Exception as e:
-        fails.append(f"skill-guard errored: {e}")
 
     # watch the watchdog: emit WatchdogRan so a dead-man alarm covers checker death
     try:

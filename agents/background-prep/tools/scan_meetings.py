@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """background-prep poller (spec 2026-07-14 + stepback fixes).
-Runs every 15 min as --no-agent cron. Deterministic tier:
+Runs every 15 min from a systemd timer. Deterministic tier:
   scan ICS 24h ahead -> scope filter (any ATTENDEE outside personal circle, excluding
   Daniel, OR a video link in DESCRIPTION) -> idempotent catch-up trigger:
   any qualifying meeting starting within 75 min with no delivered prep and no live
-  claim gets a one-shot prep agent scheduled (claim = 20-min lease, not a tombstone).
-stdout IS a Telegram message (no-agent job): print only failures. The 21:00 goal question and
-the "prep scheduled" line were removed 2026-09-23 - they read as a second, early prep.
-State: ~/.hermes/state/prep-state.json  {key: {status, ts, start}}  key = UID|occurrence-start.
+  claim gets its dossier composed and sent here (claim = 20-min lease, not a tombstone).
+stdout IS a Telegram message (telegram_send.py --run): print only failures. The 21:00 goal
+question and the "prep scheduled" line were removed 2026-09-23 - they read as a second, early prep.
+State: ~/.twin-mind/state/prep-state.json  {key: {status, ts, start}}  key = UID|occurrence-start.
 Heartbeat: PrepPollerRan metric (its own dead-man watches the watcher).
 Silent when healthy; prints only problems (watchdog pattern).
 """
 import json, os, re, subprocess, sys, urllib.request
 from datetime import datetime, timedelta, timezone
 
-STATE = os.path.expanduser("~/.hermes/state/prep-state.json")
-CIRCLE = os.path.expanduser("~/.hermes/state/personal_circle.txt")
-for line in open(os.path.expanduser("~/.hermes/.env")):
+STATE = os.path.expanduser("~/.twin-mind/state/prep-state.json")
+CIRCLE = os.path.expanduser("~/.twin-mind/state/personal_circle.txt")
+for line in open(os.path.expanduser("~/.twin-mind/.env")):
     if "=" in line and not line.strip().startswith("#"):
         k, v = line.strip().split("=", 1)
         os.environ.setdefault(k, v)
@@ -48,6 +48,13 @@ def parse_dt(prop_line):
     return dt.replace(tzinfo=local_now().tzinfo)
 
 
+def remember_name(ev, line, address):
+    """Keep the CN display name of a party; the composer uses it to name who Daniel is meeting."""
+    m = re.search(r'CN="?([^";:]+)', line)
+    if m:
+        ev.setdefault("names", {})[address] = m.group(1).strip()
+
+
 def parse_events(ics):
     """Unfold and extract what the scope filter needs. Returns list of dicts."""
     lines = re.sub(r"\r?\n[ \t]", "", ics).splitlines()
@@ -68,10 +75,14 @@ def parse_events(ics):
                 ev["status"] = line.split(":", 1)[-1].strip()
             elif line.startswith("ORGANIZER"):
                 m = re.search(r"mailto:([^\s>]+)", line, re.I)
-                if m: ev["organizer"] = m.group(1).lower()
+                if m:
+                    ev["organizer"] = m.group(1).lower()
+                    remember_name(ev, line, ev["organizer"])
             elif line.startswith("ATTENDEE"):
                 m = re.search(r"mailto:([^\s>]+)", line, re.I)
-                if m: ev["attendees"].append(m.group(1).lower())
+                if m:
+                    ev["attendees"].append(m.group(1).lower())
+                    remember_name(ev, line, m.group(1).lower())
             elif line.startswith("DESCRIPTION"):
                 ev["description"] = line.split(":", 1)[-1][:500]
             elif line.startswith(("LOCATION", "X-GOOGLE-CONFERENCE")):
@@ -165,33 +176,27 @@ def is_interview(ev):
     return any(any(d in (p or "") for d in INTERVIEW_DOMAINS) for p in parties)
 
 
-def schedule_prep(ev, st, now, hermes="~/.hermes/hermes-agent/venv/bin/hermes"):
-    delta = int((ev["start"] - now).total_seconds() / 60)
-    late = " [LATE - meeting is imminent]" if delta < 30 else ""
-    goal = st.get(key_of(ev), {}).get("goal", "")
-    mtype = "MEETING TYPE: interview (Daniel is the candidate). " if is_interview(ev) else ""
-    # shadow week: flag file present -> agent must prefix [SHADOW]; delete the file to go live, no code change
-    shadow = ("SHADOW WEEK - prefix your Telegram message with [SHADOW]. "
-              if os.path.exists(os.path.expanduser("~/.hermes/state/prep-shadow")) else "")
-    prompt = (shadow + mtype + f"MEETING PREP DUE{late}: '{ev.get('summary','?')}' at {ev['start'].strftime('%H:%M')} "
-              f"(in ~{delta} min). Counterparts: "
-              f"{', '.join(sorted(set(a for a in ev.get('attendees', []) + [ev.get('organizer', '')] if a and a != ME))) or 'unknown - research from the meeting title'}. "
-              + (f"Daniel's stated goal: {goal}. " if goal else "")
-              + "Execute the background-prep skill: research + compose the half-page dossier now. "
-              f"After confirmed delivery run: python3 -c \"import json;p='{STATE}';s=json.load(open(p));"
-              f"s['{key_of(ev)}']={{'status':'delivered','ts':'{now.isoformat()}'}};json.dump(s,open(p,'w'))\"")
-    st[key_of(ev)] = {"status": "claimed", "ts": now.isoformat(), "start": ev["start"].isoformat()}
+def run_prep(ev, st, now):
+    """Claim, compose and send one dossier. Only a dossier that reached Daniel counts as delivered;
+    any failure is reported and the next poll retries. The composer is imported here so the poller's
+    scope logic stays stdlib-only."""
+    key = key_of(ev)
+    goal = st.get(key, {}).get("goal", "")
+    st[key] = {"status": "claimed", "ts": now.isoformat(), "start": ev["start"].isoformat()}
     save_state(st)
-    r = subprocess.run(os.path.expanduser(hermes).split() +
-                       # --repeat 1: since Hermes v0.22 a bare "1m" is a recurring interval, not a
-                       # one-shot (2026-10-30: one prep ran every minute for 27 minutes).
-                       ["cron", "create", "1m", prompt, "--repeat", "1", "--name", f"prep-{key_of(ev)[:18]}",
-                        "--skill", "background-prep", "--deliver", "telegram"],
-                       capture_output=True, text=True, timeout=60)
-    if r.returncode != 0:
-        st[key_of(ev)] = {"status": "failed", "ts": now.isoformat(), "err": r.stderr[:100]}
+    prep_event = dict(ev, counterparts=sorted({a for a in ev.get("attendees", []) + [ev.get("organizer", "")]
+                                               if a and a != ME}))
+    try:
+        import compose_prep
+        compose_prep.deliver(prep_event, goal, is_interview(ev))
+    except Exception as exc:
+        st[key] = {"status": "failed", "ts": now.isoformat(), "start": ev["start"].isoformat(),
+                   "err": f"{type(exc).__name__}: {exc}"[:200]}
         save_state(st)
-        print(f"PREP SCHEDULING FAILED for {ev.get('summary')}: {r.stderr[:150]}")
+        print(f"PREP FAILED for {ev.get('summary')}: {type(exc).__name__}: {str(exc)[:150]}")
+        return
+    st[key] = {"status": "delivered", "ts": now.isoformat(), "start": ev["start"].isoformat()}
+    save_state(st)
 
 
 def heartbeat():
@@ -212,7 +217,7 @@ def main():
     st = load_state()
     for ev in evs:
         if qualifies(ev, circ) and due(ev, st, now):
-            schedule_prep(ev, st, now)
+            run_prep(ev, st, now)
     heartbeat()
 
 

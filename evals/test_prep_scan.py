@@ -116,27 +116,45 @@ occ1 = {"uid": "r1", "start": now + timedelta(minutes=60)}
 occ2 = {"uid": "r1", "start": now + timedelta(days=7, minutes=60)}
 check("recurring occurrences keyed apart", sm.key_of(occ1) != sm.key_of(occ2))
 
-# --- Telegram noise (2026-09-23): the poller's stdout IS a Telegram message (no-agent job).
+# --- Telegram noise (2026-09-23): the poller's stdout IS a Telegram message.
 # Only the dossier and real failures may reach Daniel. The old 21:00 goal question and the
 # "prep scheduled" status line read as a second, early prep. ---
 import contextlib, io, types
 _tmp = tempfile.mkdtemp()
 sm.STATE = os.path.join(_tmp, "prep-state.json")
-_real_run, _real_hb, _real_urlopen = sm.subprocess.run, sm.heartbeat, sm.urllib.request.urlopen
-_cron_args = []
-sm.subprocess.run = lambda *a, **k: (_cron_args.extend(a[0]),
-                                     types.SimpleNamespace(returncode=0, stdout="", stderr=""))[1]
+_real_hb, _real_urlopen = sm.heartbeat, sm.urllib.request.urlopen
 sm.heartbeat = lambda: None
+_sent = []
+_stub = types.ModuleType("compose_prep")
+_stub.deliver = lambda ev, goal, interview: _sent.append((ev, goal, interview))
+sys.modules["compose_prep"] = _stub
+_ev = {"uid": "q1", "summary": "Interview with X", "start": now + timedelta(minutes=70),
+       "attendees": ["attendee@example.com"]}
 out = io.StringIO()
 with contextlib.redirect_stdout(out):
-    sm.schedule_prep({"uid": "q1", "summary": "Interview with X", "start": now + timedelta(minutes=70),
-                      "attendees": ["attendee@example.com"]}, {}, now)
-check("successful scheduling prints nothing", out.getvalue() == "")
-# Hermes v0.22 reads a bare "1m" as every minute; without --repeat 1 the prep ran every minute (2026-10-30).
-check("prep job is a one-shot", "--repeat" in _cron_args
-      and _cron_args[_cron_args.index("--repeat") + 1] == "1")
-check("successful scheduling still claims", json.load(open(sm.STATE))[sm.key_of(
-    {"uid": "q1", "start": now + timedelta(minutes=70)})]["status"] == "claimed")
+    sm.run_prep(_ev, {}, now)
+check("a delivered prep prints nothing", out.getvalue() == "")
+check("a delivered prep is marked delivered", json.load(open(sm.STATE))[sm.key_of(_ev)]["status"] == "delivered")
+check("the composer gets the counterparts and the interview flag",
+      _sent[0][0]["counterparts"] == ["attendee@example.com"] and _sent[0][2] is True)
+check("a delivered prep is not due again", not sm.due(_ev, json.load(open(sm.STATE)), now))
+
+
+def _boom(ev, goal, interview):
+    raise RuntimeError("corpus-search failed")
+
+
+_stub.deliver = _boom
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    sm.run_prep(_ev, {}, now)
+check("a failed prep is reported, not silent", "PREP FAILED" in out.getvalue())
+check("a failed prep is never marked delivered", json.load(open(sm.STATE))[sm.key_of(_ev)]["status"] == "failed")
+check("a failed prep is due again on the next poll", sm.due(_ev, json.load(open(sm.STATE)), now))
+_stub.deliver = lambda ev, goal, interview: None
+_named = sm.parse_events("BEGIN:VEVENT\nDTSTART:20991231T100000Z\nUID:n1\n"
+                         'ATTENDEE;CN="Ada Lovelace";ROLE=REQ:mailto:ada@example.com\nEND:VEVENT')
+check("the CN display name is kept", _named[0]["names"] == {"ada@example.com": "Ada Lovelace"})
 tomorrow = (now.replace(hour=21, minute=5) + timedelta(days=1)).replace(hour=15, minute=0)
 ics = ("BEGIN:VCALENDAR\n" + ics_event("g1", tomorrow.astimezone(timezone.utc).strftime(":%Y%m%dT%H%M%SZ"),
                                        attendees=["attendee@example.com"]) + "END:VCALENDAR")
@@ -148,9 +166,9 @@ out = io.StringIO()
 with contextlib.redirect_stdout(out):
     sm.main()
 check("21:00 pass sends no goal question", out.getvalue() == "")
-sm.subprocess.run, sm.heartbeat, sm.urllib.request.urlopen, sm.local_now = _real_run, _real_hb, _real_urlopen, _real_now
+sm.heartbeat, sm.urllib.request.urlopen, sm.local_now = _real_hb, _real_urlopen, _real_now
 
 if FAILS:
     print(f"PREP PHYSICS: {len(FAILS)} FAILED")
     sys.exit(1)
-print("PREP PHYSICS: all 30 fixtures pass")
+print("PREP PHYSICS: all fixtures pass")

@@ -1,0 +1,9 @@
+[Unit]
+Description=Twin Mind - send dossiers for meetings that start soon (*:0/15)
+
+[Timer]
+OnCalendar=*:0/15
+Unit=meeting-prep-poller.service
+
+[Install]
+WantedBy=timers.target

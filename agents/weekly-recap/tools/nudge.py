@@ -6,32 +6,23 @@ prompt, and records the send time so the 19:30 compose step knows where the capt
 starts. The reflection Daniel types back over the next ~90 min is read from state.db by that
 step (role=user, source=telegram, timestamp in [nudge, compose]).
 
-Runs on the box (instance role, box CHANGELOG, TELEGRAM_BOT_TOKEN in ~/.hermes/.env).
+Runs on the box (instance role, box CHANGELOG, TELEGRAM_BOT_TOKEN in ~/.twin-mind/.env).
 """
 import json
 import os
 import re
+import sys
 import time
-import urllib.parse
-import urllib.request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Luxembourg")
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.join(REPO, "shared"))
+import telegram_send  # noqa: E402
+
 CHANGELOG = os.path.join(REPO, "docs", "CHANGELOG.md")
-ENV = os.path.expanduser("~/.hermes/.env")
-STATE = os.path.expanduser("~/.hermes/state/weekly-recap-nudge.json")
-
-
-def env(key):
-    try:
-        for line in open(ENV):
-            if line.startswith(key + "="):
-                return line.split("=", 1)[1].strip()
-    except Exception:
-        pass
-    return ""
+STATE = os.path.expanduser("~/.twin-mind/state/weekly-recap-nudge.json")
 
 
 def week_headlines(days=7):
@@ -48,18 +39,6 @@ def week_headlines(days=7):
         except ValueError:
             continue
     return heads
-
-
-def send_telegram(text):
-    token = env("TELEGRAM_BOT_TOKEN")
-    chat = env("TELEGRAM_HOME_CHANNEL")
-    if not token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN missing in ~/.hermes/.env")
-    if not chat:
-        raise RuntimeError("TELEGRAM_HOME_CHANNEL missing in ~/.hermes/.env")
-    data = urllib.parse.urlencode({"chat_id": chat, "text": text}).encode()
-    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
-    return json.load(urllib.request.urlopen(req, timeout=20))
 
 
 def build_message():
@@ -81,11 +60,11 @@ if __name__ == "__main__":
     if a.dry_run:
         print("[DRY RUN - not sent]\n" + msg)
     else:
-        r = send_telegram(msg)
+        r = telegram_send.send(msg)
         os.makedirs(os.path.dirname(STATE), exist_ok=True)
         json.dump({"nudge_ts": time.time(), "sent_ok": r.get("ok")}, open(STATE, "w"))
         try:  # clear last cycle's sent-marker so this nudge's recap can send
-            os.remove(os.path.expanduser("~/.hermes/state/weekly-recap-sent.txt"))
+            os.remove(os.path.expanduser("~/.twin-mind/state/weekly-recap-sent.txt"))
         except FileNotFoundError:
             pass
         print(f"nudge sent: ok={r.get('ok')} | 'done'-gated window open ({datetime.now(TZ).strftime('%H:%M %Z')})")

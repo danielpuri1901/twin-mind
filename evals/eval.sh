@@ -21,6 +21,12 @@ echo "== wispr flow meeting ingest (deterministic, free) =="
 python3 evals/test_wispr_ingest.py
 echo "== weekly recap reads meetings from the corpus (deterministic, free) =="
 python3 evals/test_recap_meetings.py
+echo "== corpus sync never uploads a failed snapshot (deterministic, free) =="
+python3 evals/test_corpus_sync.py
+echo "== dossier queries stay clean and failures stay loud (deterministic, free) =="
+python3 evals/test_compose_prep.py
+echo "== auto-retrieval crashes are never read as empty (deterministic, free) =="
+python3 evals/test_corpus_rag_stats.py
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" evals/run_regression.py --trials 3
 if [ "$1" = "--full" ]; then
@@ -29,9 +35,9 @@ if [ "$1" = "--full" ]; then
 fi
 if [ "$1" = "--judges" ] || [ "$1" = "--full" ]; then
   # Judge-regression gate: run each calibrated judge over its golden set and block if it drops
-  # below its floor. LIVE - makes Bedrock + LangSmith calls (~2 cents), so it is gated behind a
+  # below its floor. LIVE - makes Anthropic API + Langfuse calls (~2 cents), so it is gated behind a
   # flag, not on the free/deterministic default path. Run it on any judge or prompt change.
-  echo "== judge-alignment gate: insight (live: Bedrock + LangSmith) =="
+  echo "== judge-alignment gate: insight (live: Anthropic API + Langfuse) =="
   "$PY" evals/align.py insight --gate
   # coach joins once coach-faithfulness-golden is labeled:
   # "$PY" evals/align.py coach --gate
