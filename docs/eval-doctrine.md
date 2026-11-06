@@ -1,28 +1,39 @@
-# Eval doctrine: how we run online evals (adopted 2026-07-12)
+# Eval doctrine
 
-We follow two LangChain articles, translated to a one-user agent (~10 traces/day):
-- "Agent Observability: How to Monitor and Evaluate LLM Agents in Production" (blog/production-monitoring)
-- "Evaluating AI Agents at the Run, Trace, and Thread Level" (resources/agent-evals)
+Reset on 2026-11-06. Daniel removed the LLM judges, the benches and their calibration sets.
 
-| Their practice | Our translation | Status |
+They ran, but they changed nothing.
+The record on the day of the reset:
+
+- `insight_is_real` averaged 0.485 over 132 LangSmith runs, and its calibration gate read 0.76 against a floor of 0.85.
+- `coach_faithfulness` and `insight_is_real` both failed all 2 briefs scored in Langfuse, and no person was told.
+- `sections_present` averaged 0.484 over 126 LangSmith runs, and no person was told.
+- `no_em_dash` averaged 1.0 over 126 runs, so it never flagged anything.
+
+## The rule for a new check
+
+A check earns its place only if all four are true:
+
+1. It measures a real outcome, or a failure that no person would see.
+2. It runs without a person, or it blocks a build.
+3. A failure reaches Daniel on Telegram or stops the build. A score on a dashboard does not count.
+4. It failed once on purpose, to prove that the failure path works.
+
+## What remains
+
+| Check | What it catches | How it tells |
 |---|---|---|
-| Run / trace / thread primitives | Langfuse runs+traces; Telegram session = thread | have |
-| Deterministic checks on 100% of traffic | brief_check.py at 07:50: outcome (email exists, heartbeat emitted) + format contract + coverage line | BUILD next |
-| LLM judges on sampled traces (10-20%) | at our volume 100% costs ~$0.02/day: teacher + coach rubric judges, nightly | after calibration |
-| Judge calibration vs human labels (20+ labels, track agreement, recalibrate on schedule) | Daniel's daily verdicts ARE the labels. After ~20 verdicts: run judges on the same briefs, measure agreement, fix RUBRIC on disagreement (never the human). Recalibrate monthly. | doctrine |
-| Annotation queues | n=1 version: (a) the daily verdict reply, (b) weekly review - twin surfaces unrated briefs, judge-vs-Daniel disagreements, flagged traces in ONE Telegram message; Daniel labels in-line | BUILD (skill) |
-| One-click trace->dataset | one-APPROVAL: any "bad + note" verdict makes the twin DRAFT a regression item from the trace; Daniel approves; item lands in the dataset | BUILD (skill) |
-| Escalate: cheap checks always, LLM judge only on dips | adopt at scale; for now judges run daily (cost trivial) | doctrine |
-| Alert thresholds | dead-man (have) + brief_check failure -> Telegram alert + 2 consecutive "bad" verdicts on a section -> flag in next brief | BUILD-lite |
-| Retrieval quality (Daniel's ask) | two halves: (a) DID IT LOOK - deterministic trace check: required tool calls happened (part of invariant suite); (b) DID IT FIND - no auto ground truth; Daniel's "missed X" notes = retrieval-miss labels -> regression items | (a) BUILD with invariants; (b) doctrine |
-| Generation density (Daniel's ask) | 2-4 facts per item, deterministic, part of brief_check format contract | BUILD next |
-| Thread-level evals | tau2-style fixture scenarios (queued as run_regression --agent) | queued |
-| Insights / pattern mining | monthly pass over feedback.jsonl + traces; findings become dataset items or skill changes | doctrine |
+| Free tests in `evals/test_*.py` | Past bugs coming back. | Blocks the image build in CI |
+| `agents/brief/tools/brief_check.py` | The brief did not arrive, or broke its format | Telegram alert at 07:50 |
+| `shared/corpus_staleness.py` | Corpus data stopped arriving | Telegram alert |
+| `infra/bin/chat_alive.py` and the `twin-mind-chat-deadman` alarm | Chat stopped | CloudWatch alarm |
+| `agents/chat/tools/corpus_context.py` | Auto-retrieval crashes, reported as an error and never read as empty | Telegram alert each hour |
+| `evals/run_regression.py` | Past triage mistakes after a prompt or model change | Red gate, run by hand through `evals/eval.sh` |
+| `evals/longmemeval_retrieval.py`, `evals/retrieval_eval.py` | Retrieval got worse after a retrieval change. The first caught a change that took recall from 0.92 to 0.84. | By hand, before a retrieval change |
 
-Their 3-step adoption path, our position: (1) foundation = done; (2) gate releases on regression = done (eval.sh); (3) monitor continuously = THIS quarter's work, in the order above.
+`evals/costs.py` is a cost report, not a check.
 
-Rules that survive any tooling change:
-1. Deterministic checks are free - they run on everything, always.
-2. A judge is only as good as its agreement with Daniel - calibrate before trusting, recalibrate on schedule.
-3. Every "bad + why" becomes a dataset item within a day. Bugs stay fixed because they become tests.
-4. Capture at section granularity; aggregate for trends. Never capture pre-aggregated.
+## What comes next
+
+New checks start from real failures and silent failures: memory drift, Letta dreaming, retrieval drift, and harness or model upgrades.
+Each one must pass the rule above before it ships.

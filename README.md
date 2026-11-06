@@ -85,10 +85,9 @@ Older material remains available as historical context.
 
 ## Evaluation
 
-Each agent has its own job-specific dataset.
-Deterministic checks run first.
-Calibrated model judges cover subjective failures only.
-Human labels remain the reference point.
+Free tests block every image build.
+Alerts reach Telegram when a job fails or goes silent.
+The rule for any new check is in `docs/eval-doctrine.md`.
 
 Run free checks directly:
 
@@ -114,7 +113,7 @@ evals/eval.sh
 | --- | --- |
 | `agents/` | One folder per production agent. |
 | `shared/` | Corpus access, structured output, shared policy. |
-| `evals/` | Regression checks, judges, job-specific evaluation tools. |
+| `evals/` | Free tests, the regression suite and retrieval benchmarks. |
 | `pipeline/` | Data normalization, chunking, embedding, plus the box-side meeting ingester. |
 | `infra/` | Private host templates, systemd units, sudo rule, monitoring. Hermes plugins stay for rollback. |
 | `docs/` | Design records, visual maps, technical decisions. |

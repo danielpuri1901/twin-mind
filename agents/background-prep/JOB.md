@@ -40,13 +40,12 @@ Since 2026-11-06 it does.
 Before that, a script could not call the model, so the poller scheduled a one-shot agent job.
 The 20-min lease still protects against lost preps: a claim that never turns into "delivered" expires, and the next poll retries.
 
-## Planned evals (bootstrap - no judge until we have real dossiers)
+## Planned evals (no LLM judge, see docs/eval-doctrine.md)
 
 1. **Physics fixtures in the gate from birth**: evals/test_prep_scan.py - recurring, all-day, Z-vs-TZID, cancelled, circle filter, lease expiry, delivered-idempotence. Runs in eval.sh.
 2. **Poller dead-man**: PrepPollerRan metric + CloudWatch alarm (same pattern as WatchdogRan).
 3. **Did-it-look invariants** (weekly, deterministic): every qualifying calendar event has a state entry; every delivered dossier has query-log lines; zero query-log lines contain calendar/corpus text.
 4. **Verdict labels**: Daniel marks each delivered dossier good or bad with notes, like brief verdicts, to build the first labeled dataset (`prep-dossier-verdicts.jsonl`). The `[SHADOW]` prefix is gone, and dossiers go out as normal messages.
-5. **Later** (post-shadow, 15+ labels): calibrated dossier judge (pinned Sonnet) on accuracy/citations/goal-quality; then and only then a model bake-off ON THIS JOB (never a proxy dataset - the rule).
 
 **Model**: Sonnet 5.5 (`claude-sonnet-5-5`, Anthropic API, since 2026-10-23). Any swap requires this agent's own-job benchmark first.
 **Store**: ~/.twin-mind/state/{prep-state.json, personal_circle.txt, prep-query-log.txt}. No checkpointer - every prep is a fresh run; continuity lives in files.

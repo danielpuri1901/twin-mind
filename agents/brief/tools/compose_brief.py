@@ -37,7 +37,6 @@ import prefetch as PF
 import project_activity as PA
 from shared.novelty import filter_novel_with_vectors, record as record_seen
 from shared.structured import observe, propagate_attributes, structured_call
-from evals.brief_quality_judge import score_brief
 from pydantic import BaseModel
 
 MODEL = "claude-sonnet-5-5"
@@ -203,6 +202,7 @@ def technical_text(technical):
     return f"{technical.topic}\n{technical.concept}"
 
 
+@observe(name="brief", capture_input=False, capture_output=False)  # one trace per morning
 def compose_with_technical_gate(facts):
     """Compose once, then fail closed if its technical choice is hidden or repeated."""
     brief = compose(facts)
@@ -226,14 +226,6 @@ def compose_with_technical_gate(facts):
         brief.technical_thing = None
         return brief, selected, "rejected_repeat", semantic, None
     return brief, selected, "delivered", semantic, checked[0][1]
-
-
-@observe(name="brief", capture_input=False, capture_output=False)
-def compose_and_score(facts):
-    """One Langfuse trace per morning: brief.compose, then the judges' scores on that trace."""
-    composed = compose_with_technical_gate(facts)
-    score_brief(composed[0].model_dump(), facts)
-    return composed
 
 
 # ---------- deterministic render (format is code, not a creative choice) ----------
@@ -340,7 +332,7 @@ def main():
 
     facts = gather_facts()
     with propagate_attributes(session_id="brief", tags=["agent:brief", "env:prod"]):   # one Langfuse session for all briefs
-        brief, selected, technical_status, semantic, semantic_vector = compose_and_score(facts)
+        brief, selected, technical_status, semantic, semantic_vector = compose_with_technical_gate(facts)
     subject = f"Morning brief - {facts['date_subject']}"
     email = render(brief, facts)
 
@@ -358,8 +350,7 @@ def main():
         pass
     # the cron delivers this stdout to Telegram (no-agent script mode)
     print(f"Morning brief sent - {subject}. "
-          f"{len(brief.needs_you_today)} need-you items, {facts['reviewed_count']} messages reviewed.\n"
-          "Verdicts? (brief/coach/teacher: good|bad + notes)")
+          f"{len(brief.needs_you_today)} need-you items, {facts['reviewed_count']} messages reviewed.")
 
 
 if __name__ == "__main__":

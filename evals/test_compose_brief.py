@@ -17,7 +17,7 @@ structured = types.ModuleType("shared.structured")
 structured.structured_call = lambda *args, **kwargs: None
 structured.observe = lambda *args, **kwargs: lambda function: function
 structured.propagate_attributes = lambda **kwargs: contextlib.nullcontext()
-structured.get_client = None  # no Langfuse: score_brief skips the judges
+structured.get_client = None  # no Langfuse
 sys.modules["shared.structured"] = structured
 
 import compose_brief as compose

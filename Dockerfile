@@ -31,7 +31,7 @@ COPY infra/bin /app/infra/bin
 FROM code AS test
 USER ec2-user
 RUN mkdir -p "$HOME/.twin-mind/state" && touch "$HOME/.twin-mind/.env"
-RUN set -e; for t in test_tools test_project_activity_collector test_project_activity test_compose_brief test_prep_scan test_brief_check test_wispr_ingest test_recap_meetings test_corpus_sync test_compose_prep test_corpus_rag_stats test_chat_observability test_recap_headlines test_embedding_contract; do echo "== $t"; python "evals/$t.py"; done; touch /tmp/tests-passed
+RUN set -e; for t in test_tools test_project_activity_collector test_project_activity test_compose_brief test_prep_scan test_brief_check test_wispr_ingest test_recap_meetings test_corpus_sync test_corpus_parity test_compose_prep test_corpus_rag_stats test_chat_observability test_recap_headlines test_embedding_contract; do echo "== $t"; python "evals/$t.py"; done; touch /tmp/tests-passed
 
 FROM code AS final
 # This line makes the build run the test stage, so a failing test stops the push.
