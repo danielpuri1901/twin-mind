@@ -12,12 +12,12 @@
 # tzdata and TZ matter: without them ZoneInfo fails and meeting times silently come out wrong.
 FROM python:3.11-slim-bookworm AS base
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends awscli ca-certificates git \
+    && apt-get install -y --no-install-recommends awscli ca-certificates git tzdata \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd --uid 1000 --create-home --home-dir /home/ec2-user ec2-user
 COPY infra/box-requirements.txt /tmp/box-requirements.txt
 RUN pip install --no-cache-dir -r /tmp/box-requirements.txt && rm /tmp/box-requirements.txt
-ENV HOME=/home/ec2-user PYTHONUNBUFFERED=1
+ENV HOME=/home/ec2-user PYTHONUNBUFFERED=1 TZ=Europe/Luxembourg
 WORKDIR /app
 
 FROM base AS code
