@@ -34,7 +34,7 @@ ADDR = re.compile(r"[\w.+-]+@[\w.-]+\.\w+")
 UNSUB_URL = re.compile(r"<(https?://[^>]+)>")
 
 
-def load_env(path=os.path.expanduser("~/.hermes/.env")):
+def load_env(path=os.path.expanduser("~/.twin-mind/.env")):
     try:
         for line in open(path):
             line = line.strip()
@@ -61,7 +61,7 @@ def main():
     user = os.environ.get("TWIN_SMTP_ADDRESS")
     pw = os.environ.get("TWIN_SMTP_APP_PASSWORD")
     if not user or not pw:
-        print("email-census: no mail credentials in ~/.hermes/.env", file=sys.stderr)
+        print("email-census: no mail credentials in ~/.twin-mind/.env", file=sys.stderr)
         return 2
 
     since = (datetime.now() - timedelta(days=args.days)).strftime("%d-%b-%Y")

@@ -25,7 +25,7 @@ import retrieval_eval as RE   # connect, retrieve, embed_query, brt, ROOT, QA
 
 import braintrust
 
-for line in open(os.path.expanduser("~/.hermes/.env"), encoding="utf-8"):
+for line in open(os.path.expanduser("~/.twin-mind/.env"), encoding="utf-8"):
     line = line.strip()
     if line and not line.startswith("#") and "=" in line:
         k, v = line.split("=", 1)

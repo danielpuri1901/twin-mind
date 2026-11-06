@@ -6,7 +6,7 @@ Recipient is hard-locked to Daniel himself; sending to him is pre-approved
 (project rule); anything else must go through a human gate - so it refuses.
 
 Usage: send_email.py "Subject" < body.md      (or --body "text")
-Env (from ~/.hermes/.env): TWIN_SMTP_ADDRESS, TWIN_SMTP_APP_PASSWORD
+Env (from ~/.twin-mind/.env): TWIN_SMTP_ADDRESS, TWIN_SMTP_APP_PASSWORD
 """
 import argparse
 import os
@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 from email.mime.text import MIMEText
 
-ENV = os.path.expanduser("~/.hermes/.env")
+ENV = os.path.expanduser("~/.twin-mind/.env")
 if os.path.exists(ENV):
     for line in open(ENV):
         if "=" in line and not line.strip().startswith("#"):
@@ -53,7 +53,7 @@ def main():
     # so the LLM can't forget it). A CloudWatch alarm screams if 24h pass silent.
     if args.subject.lower().startswith("morning brief"):
         try:  # cursor: next brief triages mail since THIS send - no window gaps
-            sd = os.path.expanduser("~/.hermes/state"); os.makedirs(sd, exist_ok=True)
+            sd = os.path.expanduser("~/.twin-mind/state"); os.makedirs(sd, exist_ok=True)
             open(os.path.join(sd, "last_brief_sent"), "w").write(datetime.now().astimezone().isoformat())
         except Exception as e:
             print(f"cursor write failed (non-fatal): {e}")

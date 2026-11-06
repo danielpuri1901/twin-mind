@@ -2,7 +2,7 @@
 """
 inbox_read.py - read-only view of Daniel's Gmail inbox for triage.
 IMAP with BODY.PEEK: never marks messages seen, never modifies anything.
-Uses the same app password as send_email.py (from ~/.hermes/.env).
+Uses the same app password as send_email.py (from ~/.twin-mind/.env).
 
 Usage: inbox_read.py [--hours 24] [--limit 30]
 Output: JSON lines {date, from, subject, snippet, unread}
@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from email.header import decode_header, make_header
 from email.utils import parseaddr, parsedate_to_datetime
 
-ENV = os.path.expanduser("~/.hermes/.env")
+ENV = os.path.expanduser("~/.twin-mind/.env")
 if os.path.exists(ENV):
     for line in open(ENV):
         if "=" in line and not line.strip().startswith("#"):
@@ -59,7 +59,7 @@ def main():
     CUTOFF = datetime.now().astimezone() - timedelta(hours=args.hours)
     if args.since_last_brief:
         try:
-            CUTOFF = datetime.fromisoformat(open(os.path.expanduser("~/.hermes/state/last_brief_sent")).read().strip())
+            CUTOFF = datetime.fromisoformat(open(os.path.expanduser("~/.twin-mind/state/last_brief_sent")).read().strip())
         except Exception:
             pass
 

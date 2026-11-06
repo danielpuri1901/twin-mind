@@ -24,7 +24,7 @@ import os
 from datetime import datetime
 
 MODEL = "cohere.embed-multilingual-v3"
-AI_STORE = "~/.hermes/state/seen-ai.jsonl"   # the brief's AI-advancements stream
+AI_STORE = "~/.twin-mind/state/seen-ai.jsonl"   # the brief's AI-advancements stream
 
 
 def _embed(texts):

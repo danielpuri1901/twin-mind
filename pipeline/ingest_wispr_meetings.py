@@ -7,7 +7,7 @@ VERBATIM transcript plus a summary, so the twin gets more than Granola ever gave
 
 Design (same shape as the Granola ingester, which ran clean for two months):
   - Runs ON THE BOX (systemd timer, every 4h). The box is the SINGLE owner of this OAuth token
-    family (~/.hermes/mcp-tokens/wispr-ingest.json). Refresh tokens rotate; a second consumer
+    family (~/.twin-mind/mcp-tokens/wispr-ingest.json). Refresh tokens rotate; a second consumer
     (a gateway MCP entry, a Mac copy) kills the family within hours - the July Granola deaths.
   - Speaks MCP JSON-RPC over streamable HTTP directly, refreshes its own token (atomic write-back).
   - Two layers per meeting (chunking design 2026-07-17): one summary record for broad queries,
@@ -37,9 +37,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from chunk_conversations import window  # noqa: E402  the production windowing, reused as-is
 
 HOME = os.path.expanduser("~")
-TOKEN_FILE = os.path.join(HOME, ".hermes", "mcp-tokens", "wispr-ingest.json")
-CLIENT_FILE = os.path.join(HOME, ".hermes", "mcp-tokens", "wispr-ingest.client.json")
-STATE = os.path.join(HOME, ".hermes", "state", "wispr-ingest-state.json")
+TOKEN_FILE = os.path.join(HOME, ".twin-mind", "mcp-tokens", "wispr-ingest.json")
+CLIENT_FILE = os.path.join(HOME, ".twin-mind", "mcp-tokens", "wispr-ingest.client.json")
+STATE = os.path.join(HOME, ".twin-mind", "state", "wispr-ingest-state.json")
 CORPUS = os.environ.get("TWIN_CORPUS", os.path.join(HOME, "twin-corpus"))
 FTS_DB = os.path.join(CORPUS, "index", "corpus.db")
 VEC_DB = os.path.join(CORPUS, "index", "vectors.db")

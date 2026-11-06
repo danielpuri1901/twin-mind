@@ -13,9 +13,9 @@ from pathlib import Path
 from shared.novelty import filter_novel_with_vectors, record as record_seen
 
 SNAPSHOT = "~/twin-corpus/notes/project-activity.json"
-HANDLED_STORE = "~/.hermes/state/seen-technical-events.jsonl"
-NOVELTY_STORE = "~/.hermes/state/seen-technical.jsonl"
-LEGACY_NOVELTY_STORE = "~/.hermes/state/technical-covered.txt"
+HANDLED_STORE = "~/.twin-mind/state/seen-technical-events.jsonl"
+NOVELTY_STORE = "~/.twin-mind/state/seen-technical.jsonl"
+LEGACY_NOVELTY_STORE = "~/.twin-mind/state/technical-covered.txt"
 SCHEMA_VERSION = 1
 
 CODE_SUFFIXES = {

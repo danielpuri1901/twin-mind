@@ -13,7 +13,7 @@ import re
 import urllib.request
 from datetime import date, datetime, timedelta
 
-ENV = os.path.expanduser("~/.hermes/.env")
+ENV = os.path.expanduser("~/.twin-mind/.env")
 if os.path.exists(ENV):
     for line in open(ENV):
         if "=" in line and not line.strip().startswith("#"):

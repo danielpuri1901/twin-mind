@@ -64,7 +64,7 @@ JUNK_SUBJECT = re.compile(
 BULK_HINT = re.compile(r"no-?reply|newsletter|marketing|promo|deals?@|offers?@", re.I)
 
 
-def load_env(path=os.path.expanduser("~/.hermes/.env")):
+def load_env(path=os.path.expanduser("~/.twin-mind/.env")):
     try:
         for line in open(path):
             line = line.strip()
@@ -132,7 +132,7 @@ def main():
     user = os.environ.get("TWIN_SMTP_ADDRESS")
     pw = os.environ.get("TWIN_SMTP_APP_PASSWORD")
     if not user or not pw:
-        print("no mail credentials in ~/.hermes/.env", file=sys.stderr)
+        print("no mail credentials in ~/.twin-mind/.env", file=sys.stderr)
         return 2
 
     since = (datetime.now() - timedelta(days=args.days)).strftime("%d-%b-%Y")

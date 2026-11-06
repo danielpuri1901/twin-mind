@@ -32,7 +32,7 @@ Sections, in order:
 3. AI ADVANCEMENTS (2-3 items) - insights, not headlines; breadth across the AI world welcome
    (a Cohere release counts even without a project tie); tie to Daniel's work when natural, never
    forced. HARD RULE: nothing on the covered-topics list may appear again. After sending, append
-   today's topics to ~/.hermes/state/digest-covered.txt (one line each, with date).
+   today's topics to ~/.twin-mind/state/digest-covered.txt (one line each, with date).
 4. ONE TECHNICAL THING - conversation-driven: read the TOP entry of
    ~/super-project/docs/CHANGELOG.md and teach the concept underneath what Daniel and Claude just
    built or broke (yesterday's incident beats any queue item). Only on a quiet day fall back to

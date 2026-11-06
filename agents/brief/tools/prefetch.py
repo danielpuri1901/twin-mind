@@ -18,7 +18,7 @@ LUX = ZoneInfo("Europe/Luxembourg")  # Daniel's TZ - the box is in Ireland; pin 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(HERE))))   # repo root, for shared.novelty
-with open(os.path.expanduser("~/.hermes/.env"), encoding="utf-8") as env_file:
+with open(os.path.expanduser("~/.twin-mind/.env"), encoding="utf-8") as env_file:
     for line in env_file:
         if "=" in line and not line.strip().startswith("#"):
             k, v = line.strip().split("=", 1)
@@ -112,7 +112,7 @@ def inbox():
     cutoff = datetime.now().astimezone() - timedelta(hours=24)
     try:
         cutoff = datetime.fromisoformat(
-            open(os.path.expanduser("~/.hermes/state/last_brief_sent")).read().strip())
+            open(os.path.expanduser("~/.twin-mind/state/last_brief_sent")).read().strip())
     except Exception:
         pass
     known = known_contacts()
@@ -215,7 +215,7 @@ def main():
                          capture_output=True, text=True, timeout=60).stdout.strip()
     out("CALENDAR (times already local/verified)", cal or "(no events)")
     try:
-        cov = open(os.path.expanduser("~/.hermes/state/digest-covered.txt")).read().strip()
+        cov = open(os.path.expanduser("~/.twin-mind/state/digest-covered.txt")).read().strip()
     except Exception:
         cov = "(none yet)"
     out("AI TOPICS ALREADY COVERED (do NOT repeat any of these)", cov[-1500:])

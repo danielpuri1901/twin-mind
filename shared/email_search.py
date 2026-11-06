@@ -40,7 +40,7 @@ HOST = "imap.gmail.com"
 MAX_SNIPPET = 400
 
 
-def load_env(path=os.path.expanduser("~/.hermes/.env")):
+def load_env(path=os.path.expanduser("~/.twin-mind/.env")):
     """Same env file the brief uses; only fills what is not already set."""
     try:
         for line in open(path):
@@ -151,7 +151,7 @@ def main():
     user = os.environ.get("TWIN_SMTP_ADDRESS")
     password = os.environ.get("TWIN_SMTP_APP_PASSWORD")
     if not user or not password:
-        print("email-search: no mail credentials in ~/.hermes/.env", file=sys.stderr)
+        print("email-search: no mail credentials in ~/.twin-mind/.env", file=sys.stderr)
         return 2
 
     folder = SENT if args.sent else (ALL_MAIL if args.all_mail else INBOX)

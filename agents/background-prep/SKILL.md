@@ -19,7 +19,7 @@ Your whole job: research, then send ONE Telegram message - the dossier. Nothing 
 
 Outbound search queries may contain ONLY: the person's name, their company, their public role.
 NEVER put in a query: the meeting description, calendar text, corpus content, meeting transcripts, or anything Daniel wrote.
-Every query you run must also be written to `~/.hermes/state/prep-query-log.txt` (one line: timestamp TAB query). This log gets audited.
+Every query you run must also be written to `~/.twin-mind/state/prep-query-log.txt` (one line: timestamp TAB query). This log gets audited.
 
 ## Plain text ONLY (hard rule - the 2026-07-14 Nik bug)
 

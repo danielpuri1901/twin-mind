@@ -54,7 +54,7 @@ PROTECT = re.compile(
     re.I)
 
 
-def load_env(path=os.path.expanduser("~/.hermes/.env")):
+def load_env(path=os.path.expanduser("~/.twin-mind/.env")):
     try:
         for line in open(path):
             line = line.strip()

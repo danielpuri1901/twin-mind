@@ -13,7 +13,7 @@ import json, os, sys
 
 # keys are stored HERMES_LANGFUSE_*; the SDK reads LANGFUSE_* - bridge them.
 env = {}
-for line in open(os.path.expanduser("~/.hermes/.env")):
+for line in open(os.path.expanduser("~/.twin-mind/.env")):
     if "=" in line and not line.strip().startswith("#"):
         k, v = line.strip().split("=", 1); env[k] = v
 os.environ.setdefault("LANGFUSE_PUBLIC_KEY", env.get("HERMES_LANGFUSE_PUBLIC_KEY", ""))
