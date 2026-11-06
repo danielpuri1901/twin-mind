@@ -27,6 +27,10 @@ echo "== dossier queries stay clean and failures stay loud (deterministic, free)
 python3 evals/test_compose_prep.py
 echo "== auto-retrieval crashes are never read as empty (deterministic, free) =="
 python3 evals/test_corpus_rag_stats.py
+echo "== chat-alive rule and chat Langfuse traces (deterministic, free) =="
+python3 evals/test_chat_observability.py
+echo "== recap headlines accept both CHANGELOG heading forms (deterministic, free) =="
+python3 evals/test_recap_headlines.py
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" evals/run_regression.py --trials 3
 if [ "$1" = "--full" ]; then

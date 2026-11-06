@@ -31,4 +31,9 @@ aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-meeting-fresh
   --namespace TwinMind --metric-name MeetingsIngested --statistic Sum \
   --period 86400 --evaluation-periods 7 --datapoints-to-alarm 7 --threshold 1 \
   --comparison-operator LessThanThreshold --treat-missing-data notBreaching --alarm-actions "$TOPIC"
-echo "monitoring recreated: 5 metrics, 4 dead-man alarms + 1 freshness alarm, 1 topic"
+aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-chat-deadman \
+  --alarm-description "Chat is down for 1h: twin-chat.service or the Telegram gateway stopped (heartbeat every 15 min)" \
+  --namespace TwinMind --metric-name ChatServerUp --statistic Sum \
+  --period 3600 --evaluation-periods 1 --threshold 1 \
+  --comparison-operator LessThanThreshold --treat-missing-data breaching --alarm-actions "$TOPIC"
+echo "monitoring recreated: 6 metrics, 5 dead-man alarms + 1 freshness alarm, 1 topic"

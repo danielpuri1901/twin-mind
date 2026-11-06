@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 import chat_log  # noqa: E402
+import telegram_send  # noqa: E402  (its env() reads ~/.twin-mind/.env, which this unit has no EnvironmentFile for)
 
 CORPUS = os.environ.get("TWIN_CORPUS_DIR") or os.path.expanduser("~/twin-corpus")
 FTS_DB = os.path.join(CORPUS, "index", "corpus.db")
@@ -79,6 +80,43 @@ def pending(messages, fts):
                     "sender": "Daniel" if role == "user" else "Twin Mind",
                     "text": text, "session_id": message.get("conversation_id")})
     return out
+
+
+def chat_pairs(recs):
+    """(user text, assistant text) for each user message directly followed by an assistant reply.
+    ponytail: a user message whose reply lands in the next run gets no trace; fine at a 30-minute cadence."""
+    return [(a["text"], b["text"]) for a, b in zip(recs, recs[1:]) if a["who"] == "me" and b["who"] == "twin"]
+
+
+def send_traces(recs):
+    """One Langfuse trace per exchange. No keys: silent no-op. Any failure: one stderr line, ingest goes on."""
+    try:
+        keys = {n: telegram_send.env(f"HERMES_LANGFUSE_{n}") for n in ("PUBLIC_KEY", "SECRET_KEY", "BASE_URL")}
+    except OSError:
+        return
+    pairs = chat_pairs(recs)
+    if not (keys["PUBLIC_KEY"] and keys["SECRET_KEY"] and pairs):
+        return
+    lf = None
+    try:
+        for n, v in keys.items():
+            if v:
+                os.environ[f"LANGFUSE_{n}"] = v
+        from langfuse import get_client, propagate_attributes
+        lf = get_client()
+        for question, answer in pairs:
+            with propagate_attributes(session_id="chat", tags=["agent:chat", "env:prod"]):
+                with lf.start_as_current_observation(name="chat", input=question, output=answer):
+                    lf.set_current_trace_io(input=question, output=answer)
+        print(f"langfuse: {len(pairs)} chat traces sent")
+    except Exception as e:
+        print(f"langfuse: chat traces not sent ({type(e).__name__}: {str(e)[:120]})", file=sys.stderr)
+    finally:
+        try:
+            if lf:
+                lf.flush()
+        except Exception:
+            pass
 
 
 def embed(records):
@@ -142,6 +180,7 @@ def main():
             fh.write(json.dumps({k: v for k, v in r.items() if k != "message_id"},
                                 ensure_ascii=False) + "\n")
 
+    send_traces(recs)  # before embed: a Bedrock failure must not lose the traces, the ledger already has these rows
     n = embed(recs)
     print(f"appended {len(recs)} records, embedded {n}")
     return 0

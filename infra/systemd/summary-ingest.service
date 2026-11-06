@@ -1,0 +1,8 @@
+[Unit]
+Description=Twin Mind - Wispr Flow meeting ingester (official MCP, transcripts + summaries)
+[Service]
+Type=oneshot
+User=ec2-user
+Environment=TWIN_CORPUS=/home/ec2-user/twin-corpus
+Environment=HOME=/home/ec2-user
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/pipeline/ingest_wispr_meetings.py

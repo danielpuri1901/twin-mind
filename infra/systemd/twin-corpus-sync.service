@@ -1,0 +1,8 @@
+[Unit]
+Description=Twin Mind corpus sync to S3 (consistent SQLite snapshots)
+
+[Service]
+Type=oneshot
+User=ec2-user
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python /home/ec2-user/super-project/shared/corpus_sync.py
+Environment=PATH=/usr/local/bin:/usr/bin:/bin

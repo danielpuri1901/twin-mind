@@ -1,0 +1,7 @@
+[Unit]
+Description=Friday 18:02-19:58 every 2 min - weekly-recap done-gate poll
+[Timer]
+OnCalendar=Fri *-*-* 18..19:03/2:00
+Persistent=false
+[Install]
+WantedBy=timers.target
