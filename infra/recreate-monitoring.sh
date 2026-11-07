@@ -36,4 +36,13 @@ aws cloudwatch put-metric-alarm --region $R --alarm-name twin-mind-chat-deadman 
   --namespace TwinMind --metric-name ChatServerUp --statistic Sum \
   --period 3600 --evaluation-periods 1 --threshold 1 \
   --comparison-operator LessThanThreshold --treat-missing-data breaching --alarm-actions "$TOPIC"
-echo "monitoring recreated: 6 metrics, 5 dead-man alarms + 1 freshness alarm, 1 topic"
+# Any successful Bedrock model call except Cohere embeddings and Amazon rerank. The pattern lives in security-filters.json.
+NAME=BedrockCallNotCohereOrRerank
+aws logs put-metric-filter --region $R --cli-input-json "$(python3 -c "import json, sys
+print(json.dumps({**next(f for f in json.load(open(sys.argv[1])) if f['filterName'] == sys.argv[2]), 'logGroupName': '/aws/cloudtrail/twin-mind-account'}))" "$(dirname "$0")/security-filters.json" $NAME)"
+aws cloudwatch put-metric-alarm --region $R --alarm-name "twin-mind-security-$NAME" \
+  --alarm-description "A model other than Cohere embeddings or Amazon rerank ran on Bedrock. Claude calls belong on the Anthropic API." \
+  --namespace TwinMind/Security --metric-name "$NAME" --statistic Sum \
+  --period 300 --evaluation-periods 1 --threshold 1 \
+  --comparison-operator GreaterThanOrEqualToThreshold --treat-missing-data notBreaching --alarm-actions "$TOPIC"
+echo "monitoring recreated: 7 metrics, 5 dead-man alarms + 1 freshness alarm + 1 Bedrock alarm, 1 topic"

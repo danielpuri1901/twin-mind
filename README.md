@@ -100,8 +100,8 @@ python3 evals/test_recap_meetings.py
 ```
 
 The full ship gate calls the Anthropic API, so it can create a small model charge.
-Nothing enforces it.
-There is no deploy CI: a deploy is files copied by hand to the box over SSM.
+`infra/deploy_box.sh` runs it on the box before every deploy and stops if it is red.
+`infra/check_box.sh` proves that the box matches `main`.
 
 ```bash
 evals/eval.sh

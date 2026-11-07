@@ -28,7 +28,10 @@ A check earns its place only if all four are true:
 | `shared/corpus_staleness.py` | Corpus data stopped arriving | Telegram alert |
 | `infra/bin/chat_alive.py` and the `twin-mind-chat-deadman` alarm | Chat stopped | CloudWatch alarm |
 | `agents/chat/tools/corpus_context.py` | Auto-retrieval crashes, reported as an error and never read as empty | Telegram alert each hour |
-| `evals/run_regression.py` | Past triage mistakes after a prompt or model change | Red gate, run by hand through `evals/eval.sh` |
+| `BedrockCallNotCohereOrRerank` alarm (`infra/security-filters.json`) | A model other than Cohere or rerank ran on Bedrock | Email through `twin-mind-alerts` |
+| `infra/check_box.sh` | Box code or an installed copy differs from `main` | Stops `infra/deploy_box.sh` at the end of a deploy, run by hand between deploys |
+| `infra/check_aws.py` | AWS config drifted, including who can reach Claude on Bedrock | Red output, run by hand after each AWS change |
+| `evals/run_regression.py` | Past triage mistakes after a prompt or model change | Red gate: `infra/deploy_box.sh` stops the deploy |
 | `evals/longmemeval_retrieval.py`, `evals/retrieval_eval.py` | Retrieval got worse after a retrieval change. The first caught a change that took recall from 0.92 to 0.84. | By hand, before a retrieval change |
 
 `evals/costs.py` is a cost report, not a check.

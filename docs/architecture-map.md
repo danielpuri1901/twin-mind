@@ -43,7 +43,7 @@ flowchart TB
     end
 
     PREP -->|"derived data, over SSM"| DERIVED
-    REPO -->|"files copied by hand over SSM"| AGENTS
+    REPO -->|"git checkout, infra/deploy_box.sh"| AGENTS
     AGENTS -->|inference| ANTHROPIC
     AGENTS -->|embeddings| BEDROCK
     AGENTS -->|traces/scores| LANGFUSE
@@ -200,7 +200,7 @@ flowchart TB
     DS[("~/twin-corpus/datasets/<br/>corpus-qa ...")]
 
     DS --> RE
-    GATE -.->|"rule, run by hand"| SHIP["deploy to box (files copied over SSM)"]
+    GATE -->|"a red gate stops the deploy"| SHIP["infra/deploy_box.sh"]
 
     classDef gate fill:#fce8e6,stroke:#ea4335,color:#000
     classDef eval fill:#fef7e0,stroke:#f9ab00,color:#000
@@ -258,7 +258,7 @@ flowchart LR
 
 | Thing | Value |
 |---|---|
-| Box | One private EC2 host, t4g.small, eu-west-1, zero-inbound, SSM-only. Not a git checkout; deploys are files copied by hand over SSM |
+| Box | One private EC2 host, t4g.small, eu-west-1, zero-inbound, SSM-only. A git checkout of the public repo. `infra/deploy_box.sh` deploys it and `infra/check_box.sh` proves it matches `main` |
 | Chat agent | Letta Code 0.34.41, self-hosted, `twin-chat.service`, own OS user `twin-chat`, Sonnet 5.5. Bridge: `agents/chat/mods/twin_mind.ts`. Chat log: `/var/lib/twin-chat/chat-log.jsonl` (`shared/chat_log.py`). Hermes is stopped, kept for rollback |
 | Scheduled jobs | systemd timers (`infra/systemd/`): morning-brief, morning-brief-watchdog, meeting-prep-poller |
 | Inference | Anthropic API since 2026-10-22: Claude Sonnet 5.5 drafting (since 2026-10-23), Haiku 4.5 compression; key from Secrets Manager `aws-inference`. Bedrock keeps Cohere embed-multilingual-v3 and Amazon rerank (eu-central-1) |

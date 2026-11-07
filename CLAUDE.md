@@ -23,7 +23,7 @@ Design: `docs/2026-06-30-twin-mind-design.md` · Build plan: `docs/gameplan.md` 
 - **Eval-first:** build the scorecard before tuning anything. Nothing "improves" the twin unless it beats the scorecard.
 - **Eval reset (Daniel's call, 2026-11-06):** the LLM judges, benches and calibration sets are gone because they flagged nothing anyone acted on. A new check must measure a real outcome or a silent failure, run without a person or block a build, reach Daniel on Telegram or stop the build, and fail once on purpose first. Details and what remains: `docs/eval-doctrine.md`.
 - **Evals measure the ACTUAL job (Daniel's order, 2026-07-14, after drafting-gold nearly caused a bad model swap):** before any eval result informs a decision, name the production job it measures. Datasets for cancelled or parked jobs are DELETED, not repurposed as proxies. The regression suite qualifies judgment only - never composition.
-- **Ship gate (mechanized 2026-07-08):** no change to skills, SOUL, tools, prompts, or model tier ships to the box without `evals/eval.sh` green (triage regression at 100%). Nothing enforces it: there is no deploy CI (see Current state), so the gate is a rule that Daniel and the agents follow by hand. Baseline: 9/9 PASS on first run, 2026-07-08.
+- **Ship gate (mechanized 2026-07-08):** no change to skills, SOUL, tools, prompts, or model tier ships to the box without `evals/eval.sh` green (triage regression at 100%). `infra/deploy_box.sh` enforces it: the script runs the gate on a separate copy and stops if the gate is red. Baseline: 9/9 PASS on first run, 2026-07-08.
 - **Autonomy by reversibility:** act autonomously on read / search / research / draft; require human approval for send / spend / commit / anything irreversible.
 - **Cost discipline:** credits go to compute (inference + a one-off GPU for the fine-tune), not storage. Stop GPUs the moment a run ends. No idle managed services.
 
@@ -54,7 +54,7 @@ to the agent.
 - Meeting prep is code, not an agent: `agents/background-prep/tools/compose_prep.py` does code research plus two model calls that have no tools.
 - The twin-chat user cannot reach the instance role (iptables on the metadata address), `.env` or the corpus. Its tools run through a narrow sudo rule (`infra/sudoers/twin-chat`). It has no shell outside its memory repo, `web_fetch` needs Daniel's approval each time, Letta's own domains are blocked in `/etc/hosts`, and the mods and governed skills are immutable.
 - Backups: `shared/corpus_sync.py` refuses to upload when any snapshot fails, and it also backs up `/var/lib/twin-chat`.
-- There is no deploy CI. A deploy is a set of files copied by hand over SSM. The box is not a git checkout.
+- A deploy is `infra/deploy_box.sh`, run on the box. `~/super-project` is a git checkout of the public repo. `infra/check_box.sh` proves that the checkout is clean and at `main`, and that installed copies (systemd units, sudoers, Letta mod and skills, `twin-chat-letta`) equal the repo. The deploy script does not install those copies.
 - Runtime uses a private AWS host reached through SSM.
 - Private identifiers plus live operational notes belong in ignored CLAUDE.private.md.
 - Read CLAUDE.private.md when it exists locally.
