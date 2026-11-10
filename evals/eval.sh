@@ -39,10 +39,14 @@ echo "== auto-retrieval crashes are never read as empty (deterministic, free) ==
 free test_corpus_rag_stats
 echo "== chat-alive rule and chat Langfuse traces (deterministic, free) =="
 free test_chat_observability
+echo "== a chat message with no answer raises an alarm (deterministic, free) =="
+free test_reply_check
 echo "== recap headlines accept both CHANGELOG heading forms (deterministic, free) =="
 free test_recap_headlines
 echo "== chat replies reach Telegram, search results fetch without asking (deterministic, free) =="
 node --test agents/chat/mods/twin_mind.test.mjs
+echo "== chat contract: a Telegram message gets its answer through real Letta (a few cents) =="
+if [ -x /opt/letta/bin/letta ]; then sh evals/chat_contract.sh; else echo "SKIPPED: this host has no Letta. The box runs it on every deploy."; fi
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" evals/run_regression.py --trials 3
 echo "EVAL GATE: GREEN"

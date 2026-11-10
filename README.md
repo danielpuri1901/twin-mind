@@ -101,6 +101,7 @@ python3 evals/test_recap_meetings.py
 
 The full ship gate calls the Anthropic API, so it can create a small model charge.
 `infra/deploy_box.sh` runs it on the box before every deploy and stops if it is red.
+After the checkout it runs `infra/install_box.sh`, which installs the copies that live outside the folder: the systemd units, the sudo rule, the chat mod and the skills.
 `infra/check_box.sh` proves that the box matches `main`.
 
 ```bash

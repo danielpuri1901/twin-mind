@@ -265,4 +265,4 @@ flowchart LR
 | Retrieval | Hybrid (FTS5 + sqlite-vec + RRF) via `corpus-search`; windowed + contextual chunks (promoted 2026-07-21) |
 | Observability | Langfuse Cloud (free tier) is the only trace store |
 | Channels | Telegram Bot API (interactive), Gmail SMTP (brief + recap, send-only, recipient-locked) |
-| Hard rules | corpus never to a code remote · ship gate green before deploy (by hand) · approval for send/spend/irreversible and for each web fetch |
+| Hard rules | corpus never to a code remote · ship gate green before deploy (by hand) · approval for send/spend/irreversible and for a web fetch of a URL that no search returned |

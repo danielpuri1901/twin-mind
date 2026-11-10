@@ -1,0 +1,11 @@
+[Unit]
+Description=Twin Mind - chat reply check (*:0/5)
+
+[Timer]
+# Keep the period equal to EVERY in agents/chat/tools/reply_check.py. A late run could skip a message.
+OnCalendar=*:0/5
+AccuracySec=1s
+Unit=twin-chat-reply-check.service
+
+[Install]
+WantedBy=timers.target
