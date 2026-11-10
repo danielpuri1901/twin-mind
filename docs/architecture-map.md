@@ -150,7 +150,7 @@ All read the corpus through `corpus-search`; all Claude inference goes through t
 flowchart TB
     subgraph RT["Box"]
         direction TB
-        CHAT["💬 chat - interactive twin<br/>Letta Code, Telegram, on-demand<br/>bridge: mods/twin_mind.ts<br/>tools: corpus · code · email · web search, web fetch (approval)<br/>log: /var/lib/twin-chat/chat-log.jsonl"]
+        CHAT["💬 chat - interactive twin<br/>Letta Code, Telegram, on-demand<br/>bridge: mods/twin_mind.ts<br/>tools: corpus · code · email · web search, web fetch (asks unless a search result)<br/>log: /var/lib/twin-chat/chat-log.jsonl"]
         BRIEF["📋 brief - morning email<br/>systemd timer 07:30 · watchdog 07:50<br/>script: compose_brief.py (one model call)<br/>tools: prefetch · inbox_read · calendar_read · send_email · brief_check<br/>model: Sonnet"]
         PREP["🗂️ background-prep - meeting dossiers<br/>systemd timer every 15 min · fires 75-15 min before meetings<br/>code: scan_meetings · compose_prep (research in code, 2 no-tool model calls)"]
         RECAP["🗓️ weekly-recap - Friday reflection<br/>18:00 Telegram nudge -> 'done' gate -> ~19:30 email<br/>tools: nudge · recap · send_recap<br/>reads the chat log"]
