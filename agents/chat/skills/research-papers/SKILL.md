@@ -2,7 +2,7 @@
 name: research-papers
 description: Find and summarize academic papers via the Semantic Scholar API (free, keyless)
 ---
-When Daniel asks about research papers, use the Semantic Scholar Graph API through the `web_fetch` tool. Daniel approves each fetch, so plan one search and one detail call. No key needed (rate-limited; be polite - one request per query, cache what you learn to wiki/learning/).
+When Daniel asks about research papers, use the Semantic Scholar Graph API through the `web_fetch` tool. These API URLs are not web_search results, so each fetch asks Daniel. Plan one search and one detail call. No key needed (rate-limited; be polite - one request per query, cache what you learn to wiki/learning/).
 
 Search papers:
   https://api.semanticscholar.org/graph/v1/paper/search?query=<urlencoded>&limit=5&fields=title,year,abstract,citationCount,url,authors

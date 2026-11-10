@@ -41,6 +41,8 @@ echo "== chat-alive rule and chat Langfuse traces (deterministic, free) =="
 free test_chat_observability
 echo "== recap headlines accept both CHANGELOG heading forms (deterministic, free) =="
 free test_recap_headlines
+echo "== chat replies reach Telegram, search results fetch without asking (deterministic, free) =="
+node --test agents/chat/mods/twin_mind.test.mjs
 echo "== regression suite: past mistakes stay fixed (bar: 100%) =="
 "$PY" evals/run_regression.py --trials 3
 echo "EVAL GATE: GREEN"
