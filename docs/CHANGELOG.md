@@ -1,5 +1,27 @@
 # Twin Mind - canonical changelog
 
+## 2026-11-10
+
+Chat lost answers after the move to Letta, and no check noticed.
+Letta sends to Telegram only what the model sends with the `MessageChannel` tool, and Hermes had sent the model's final text with gateway code.
+Nobody had written that difference down, so the cutover did not carry it over.
+Since the cutover, 5 of 57 Telegram turns lost content: 4 had no send at all, and 1 sent a short message and left the answer as plain text.
+The only chat alarm watched the process, so it stayed green through all five.
+
+Chat:
+- The mod sends a turn's final text to Telegram itself when that text never went out, and marks the chat-log row `via: relay`. If the send fails, the agent gets one nudge.
+- Letta built the same relay as a setting and removed it three days later (letta-code PR 4043 and PR 4956), so the relay stays in the mod.
+- `web_fetch` runs at once for a URL that `web_search` returned. Any other URL still asks Daniel.
+- Replies sent with `send-rich` reach the chat log.
+
+Checks:
+- `evals/chat_contract.sh` is in the ship gate. It runs one real turn through Letta in a throwaway home with a fake Telegram, and it fails when the mod does not load, when the turn-start context does not reach the model, or when a plain-text answer does not arrive.
+- `agents/chat/tools/reply_check.py` runs every 5 minutes and sends a Telegram alert when a message got no answer. On the real log it flags 2 of the 4 answers that never arrived. Daniel wrote again within 5 minutes on the other 2, and the relay covers those.
+- `infra/install_box.sh` installs the units, the sudo rule, the mod and the skills, and `infra/deploy_box.sh` runs it. Before, those copies were installed by hand.
+- `infra/check_box.sh` also checks the immutable flag on the mod, that every timer is enabled, and that the installed Letta equals `infra/letta-version`.
+
+Verified before the merge: a real Letta turn in a sandbox on the box delivered a plain-text answer to a fake Telegram with the live mod, and delivered nothing with the mod from before the fix.
+
 ## 2026-11-06
 
 Chat moved from Hermes to self-hosted Letta, and the scheduled jobs moved to systemd timers, on Daniel's instruction.

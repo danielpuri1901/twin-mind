@@ -6,16 +6,17 @@
  *     except for a URL that web_search returned.
  *   - chat log: every Telegram message and reply, the contract in shared/chat_log.py.
  *   - shell policy: no shell, except the memory repo commands that dreaming needs.
- *   - reply check: Telegram gets only what MessageChannel sends. When a turn ends in plain text, this mod
- *     sends that text to Telegram itself, as the Hermes gateway did. If that send fails, the agent gets
- *     one nudge to send it.
+ *   - reply check: Telegram gets only what MessageChannel sends. When a turn ends with text that never
+ *     went out, this mod sends that text to Telegram itself, as the Hermes gateway did, and marks the
+ *     chat-log row `via: relay`. If that send fails, the agent gets one nudge to send it.
  *
  * Tools run as the job user through a narrow sudo rule (infra/sudoers/twin-chat), so this agent's OS
  * user never holds the corpus, the API keys or the instance role. Arguments go through execFile, so
  * no shell ever parses them.
  *
  * Deployed read-only to ~/.letta/mods/. Letta's hooks only fire in its terminal UI, not on server
- * turns, which is why this is a mod. Checked against Letta 0.34.41; re-check on any version bump.
+ * turns, which is why this is a mod. The Letta version is pinned in infra/letta-version. Before a bump,
+ * run evals/chat_contract.sh against the new version.
  */
 import { execFile } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
@@ -25,6 +26,7 @@ const REPO = "/home/ec2-user/super-project";
 const CHAT_LOG = process.env.TWIN_CHAT_LOG ?? "/var/lib/twin-chat/chat-log.jsonl"; // tests point it elsewhere
 // Letta's own Telegram account file. The agent's file tools cannot read it (SECRET_PATH); this code can.
 const TELEGRAM_ACCOUNTS = process.env.TWIN_TELEGRAM_ACCOUNTS ?? "/home/twin-chat/.letta/channels/telegram/accounts.json";
+const TELEGRAM_API = process.env.TWIN_TELEGRAM_API ?? "https://api.telegram.org"; // the contract test uses a local fake
 const TELEGRAM_LIMIT = 4000; // Telegram rejects a message above 4096 characters
 const CODE_COPY = "/home/twin-chat/twin-mind";
 const TIME_ZONE = "Europe/Amsterdam";
@@ -69,9 +71,9 @@ export function channelMessage(raw) {
   return unescapeXml(body).trim();
 }
 
-function logMessage(role, text, conversationId) {
+function logMessage(role, text, conversationId, via) {
   try {
-    const row = { ts: Date.now() / 1000, role, text, conversation_id: conversationId ?? null };
+    const row = { ts: Date.now() / 1000, role, text, conversation_id: conversationId ?? null, ...(via ? { via } : {}) };
     appendFileSync(CHAT_LOG, `${JSON.stringify(row)}\n`, { mode: 0o640 });
   } catch (error) {
     console.error(`twin_mind: chat log write failed: ${error.message}`);
@@ -144,6 +146,16 @@ export function rememberSearchUrls(text) {
 }
 
 const SENDS = new Set(["send", "send-rich"]);
+// After a real send the model closes with a few characters ("Sent."). Measured on 57 real turns on
+// 2026-11-10: a median of 5, and the only closing text over 120 was an answer that never arrived.
+const LONG_REPLY = 120;
+const squash = (text) => text.replace(/\W+/g, "").toLowerCase();
+
+/** True when a turn's final text still has to reach Daniel. `sent` is the squashed text of this turn's sends. */
+export function leftUnsent(finalText, sent) {
+  if (!sent) return true;
+  return finalText.length > LONG_REPLY && !sent.includes(squash(finalText).slice(0, 60));
+}
 export const UNSENT_NUDGE = "Your last reply was plain text, so it never reached Daniel. Telegram only gets what "
   + "MessageChannel sends. Send that reply to him now with MessageChannel, to the chat of his last message. "
   + "Do not redo the work.";
@@ -164,7 +176,7 @@ async function sendToTelegram(chatId, text) {
   const { accounts } = JSON.parse(readFileSync(TELEGRAM_ACCOUNTS, "utf8"));
   const token = accounts?.find((account) => account.enabled !== false)?.token;
   if (!token) throw new Error("no enabled Telegram account");
-  const post = (body) => fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const post = (body) => fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, ...body }),
@@ -198,8 +210,8 @@ function tool(letta, { name, description, properties, required, requiresApproval
 
 export default function activate(letta) {
   const disposers = [];
-  // Telegram turns with no MessageChannel send yet, by conversation: { chatId, nudged }.
-  const unsent = new Map();
+  // The Telegram turn in progress, by conversation: { chatId, nudged, sent }. `sent` is what went out so far.
+  const turns = new Map();
   // Conversations whose last reply this mod sent, so the next turn tells the agent not to resend it.
   const sentForAgent = new Set();
 
@@ -212,7 +224,7 @@ export default function activate(letta) {
     if (!message) return; // reflection, schedules and subagents are not Daniel talking
     logMessage("user", message, event.conversationId);
     const chatId = raw.match(/<channel-notification\b[^>]*\bchat_id="([^"]+)"/)?.[1] ?? null;
-    unsent.set(event.conversationId, { chatId, nudged: false });
+    turns.set(event.conversationId, { chatId, nudged: false, sent: "" });
     const sentNote = sentForAgent.delete(event.conversationId) ? `${SENT_FOR_YOU}\n\n` : "";
     const note = `\n\n<twin-mind-context>\n${sentNote}${await contextFor(message)}\n</twin-mind-context>`;
     const content = typeof item.content === "string"
@@ -230,18 +242,20 @@ export default function activate(letta) {
     const { action, message } = event.args ?? {};
     if ((SENDS.has(action) || !action) && typeof message === "string" && message.trim()) {
       logMessage("assistant", message, event.conversationId);
-      unsent.delete(event.conversationId);
+      const turn = turns.get(event.conversationId);
+      if (turn) turn.sent += squash(message);
     }
   }));
 
-  // The model sometimes ends a turn with plain text instead of MessageChannel. Letta keeps that text
-  // in the transcript and sends nothing, so Daniel waits. Send it from here; if that fails, one nudge.
+  // The model sometimes ends a turn with plain text instead of MessageChannel, with or without a short
+  // send before it. Letta keeps that text in the transcript and sends nothing, so Daniel waits.
+  // Send it from here; if that fails, one nudge.
   disposers.push(letta.events.on("turn_end", async (event) => {
     const id = event.conversationId;
-    const turn = unsent.get(id);
-    unsent.delete(id);
+    const turn = turns.get(id);
+    turns.delete(id);
     const text = String(event.assistantMessage ?? "").trim();
-    if (!turn || !text) return;
+    if (!turn || !text || !leftUnsent(text, turn.sent)) return;
     if (turn.nudged) {
       console.error("twin_mind: reply still unsent after the nudge");
       return;
@@ -249,12 +263,12 @@ export default function activate(letta) {
     try {
       if (!turn.chatId) throw new Error("no chat_id in the channel notification");
       await sendToTelegram(turn.chatId, text);
-      logMessage("assistant", text, id);
+      logMessage("assistant", text, id, "relay");
       sentForAgent.add(id);
       console.error("twin_mind: reply was plain text, the mod sent it to Telegram");
     } catch (error) {
       console.error(`twin_mind: sending the plain-text reply failed (${error.message}), nudging the agent`);
-      unsent.set(id, { ...turn, nudged: true });
+      turns.set(id, { ...turn, nudged: true });
       return { continue: UNSENT_NUDGE };
     }
   }));

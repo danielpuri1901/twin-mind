@@ -1,0 +1,12 @@
+[Unit]
+Description=Twin Mind - tell Daniel when a chat message got no answer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ec2-user
+WorkingDirectory=/home/ec2-user/super-project
+EnvironmentFile=/home/ec2-user/.twin-mind/.env
+Environment=PATH=/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/ec2-user/.twin-mind/venv/bin/python shared/telegram_send.py --run /home/ec2-user/.twin-mind/venv/bin/python agents/chat/tools/reply_check.py

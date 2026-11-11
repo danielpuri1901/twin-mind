@@ -1,6 +1,8 @@
 """The chat agent's messages, as the twin_mind mod records them.
 
 One JSON object per line: {ts, role, text, conversation_id}, where role is user or assistant.
+An assistant row that the mod sent itself, because the model left it as plain text, also has
+via: "relay". Count them with: grep -c '"via":"relay"' /var/lib/twin-chat/chat-log.jsonl
 This is the only contract the corpus ingest and the weekly recap have with the chat harness, so
 swapping the harness means changing the writer and nothing else. Nothing here depends on Letta.
 

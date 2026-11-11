@@ -32,6 +32,9 @@ A check earns its place only if all four are true:
 | `infra/check_box.sh` | Box code or an installed copy differs from `main` | Stops `infra/deploy_box.sh` at the end of a deploy, run by hand between deploys |
 | `infra/check_aws.py` | AWS config drifted, including who can reach Claude on Bedrock | Red output, run by hand after each AWS change |
 | `evals/run_regression.py` | Past triage mistakes after a prompt or model change | Red gate: `infra/deploy_box.sh` stops the deploy |
+| `evals/chat_contract.sh` | Chat stopped answering through the real harness: the mod did not load, the turn-start context did not reach the model, or a plain-text answer did not arrive. It failed on purpose on 2026-11-10 against the mod from before the fix. | Red gate: `infra/deploy_box.sh` stops the deploy |
+| `agents/chat/tools/reply_check.py` | A chat message got no answer within 5 minutes. On the real log of 2026-11-10 it flags 2 of the 4 answers that never arrived; Daniel wrote again within 5 minutes on the other 2. | Telegram alert |
+| `grep -c '"via":"relay"' /var/lib/twin-chat/chat-log.jsonl` | How often the model left its answer unsent and the mod had to send it | By hand. A rising count means the prompt or the model changed for the worse |
 | `evals/longmemeval_retrieval.py`, `evals/retrieval_eval.py` | Retrieval got worse after a retrieval change. The first caught a change that took recall from 0.92 to 0.84. | By hand, before a retrieval change |
 
 `evals/costs.py` is a cost report, not a check.
